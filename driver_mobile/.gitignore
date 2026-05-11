@@ -1,0 +1,25 @@
+# Flutter/Dart/Pub
+.dart_tool/
+.packages
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub/
+.pub-cache/
+build/
+
+# IDE
+.idea/
+.vscode/
+
+# Platform artifacts
+android/.gradle/
+ios/Pods/
+
+# Firebase Configuration (sensitive)
+google-services.json
+GoogleService-Info.plist
+serviceAccountKey.json
+.env
+.env.local
+.env.*.local
+
