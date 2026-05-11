@@ -35,7 +35,7 @@ function convertFirebaseUserToUser(firebaseUser: FirebaseUser): User {
     role: 'driver', // Default, sera mis à jour depuis Firestore
     phone: firebaseUser.phoneNumber || '',
     avatar: firebaseUser.photoURL || '',
-    createdAt: firebaseUser.metadata.creationTime?.toISOString() || new Date().toISOString(),
+    createdAt: (firebaseUser.metadata.creationTime as string) || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
 }

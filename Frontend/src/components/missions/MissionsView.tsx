@@ -57,16 +57,18 @@ export function MissionsView() {
           userId: fm.assignedTo || 'unknown',
           user: {
             id: 'unknown',
-            email: '',
+            email: 'unknown@example.com',
             firstName: 'Chauffeur',
-            lastName: 'Assigné',
-            role: 'driver',
+            lastName: 'Inconnu',
+            role: 'driver' as const,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           },
-          status: 'active',
-          rating: 5,
+          status: 'active' as const,
+          rating: 0,
           totalMissions: 0,
+          licenseNumber: 'TEMP-001',
+          licenseExpiry: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
@@ -80,8 +82,9 @@ export function MissionsView() {
           status: 'available',
           year: 2024,
           mileage: 0,
-          lastService: new Date().toISOString(),
-          nextService: new Date().toISOString(),
+          fuelType: 'diesel',
+          // lastService: new Date().toISOString(), // Commented - not in Vehicle type
+          // nextService: new Date().toISOString(), // Commented - not in Vehicle type
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };

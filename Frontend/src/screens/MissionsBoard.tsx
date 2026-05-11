@@ -462,7 +462,7 @@ export function MissionsBoard() {
                     key={mission.id}
                     mission={mission}
                     driverName={getDriverName(mission.assignedTo)}
-                    onComplete={() => {}}
+                    onComplete={async () => {}}
                     loading={false}
                   />
                 ))}

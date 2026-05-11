@@ -277,6 +277,39 @@ async function createMissionForUser(userId, payload) {
       createdAt: nowIso(),
     });
 
+    // Send FCM notification
+    try {
+      const driverDoc = await db.collection(COLLECTIONS.DRIVERS).doc(driver.id).get();
+      const driverData = driverDoc.data();
+      
+      if (driverData.fcmToken) {
+        await admin.messaging().send({
+          token: driverData.fcmToken,
+          notification: {
+            title: 'Nouvelle Mission',
+            body: `Mission vers ${mission.destination} assignée`,
+            sound: 'default',
+            badge: '1',
+          },
+          data: {
+            type: 'mission_assigned',
+            missionId: missionRef.id,
+            click_action: 'FLUTTER_NOTIFICATION_CLICK',
+          },
+          android: {
+            priority: 'high',
+            notification: {
+              sound: 'default',
+              clickAction: 'FLUTTER_NOTIFICATION_CLICK',
+            },
+          },
+        });
+        console.log('✅ FCM notification sent for mission start');
+      }
+    } catch (fcmError) {
+      console.error('❌ FCM send error:', fcmError.message);
+    }
+
     // Fetch and hydrate the created mission
     const createdMission = { id: missionRef.id, ...mission };
     return hydrateMission(createdMission);
