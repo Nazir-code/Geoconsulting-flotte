@@ -11,7 +11,6 @@ import {
   User as FirebaseUser,
   AuthError,
   setPersistence,
-  browserLocalPersistence,
   browserSessionPersistence,
 } from 'firebase/auth';
 import { auth } from '@/lib/firebaseConfig';
@@ -72,11 +71,19 @@ export class AuthService {
 
   /**
    * Configurer la persistance de session
+   * 
+   * IMPORTANT: TOUJOURS utiliser browserSessionPersistence pour la sécurité
+   * - Les données sont effacées à la fermeture complète du navigateur
+   * - L'utilisateur doit se reconnecter après redémarrage du navigateur
+   * - Le paramètre rememberMe est ignoré (comportement sécurisé par défaut)
+   * 
+   * @param rememberMe IGNORÉ pour des raisons de sécurité
    */
-  static async configurePersistence(rememberMe: boolean = true): Promise<void> {
+  static async configurePersistence(rememberMe?: boolean): Promise<void> {
     try {
-      const persistence = rememberMe ? browserLocalPersistence : browserSessionPersistence;
-      await setPersistence(auth, persistence);
+      // Toujours utiliser browserSessionPersistence (plus sécurisé)
+      // rememberMe est ignoré intentionnellement
+      await setPersistence(auth, browserSessionPersistence);
     } catch (error) {
       console.error('Erreur configuration persistance:', error);
       throw new Error('Impossible de configurer la persistance de session');
@@ -88,8 +95,8 @@ export class AuthService {
    */
   static async signUp(data: SignUpData): Promise<FirebaseUser> {
     try {
-      // Configurer la persistance avant l'inscription
-      await this.configurePersistence(true);
+      // Configurer la persistance avant l'inscription (toujours sécurisée)
+      await this.configurePersistence();
 
       const userCredential = await createUserWithEmailAndPassword(
         auth,
@@ -113,8 +120,9 @@ export class AuthService {
    */
   static async signIn(data: SignInData): Promise<FirebaseUser> {
     try {
-      // Configurer la persistance avant la connexion
-      await this.configurePersistence(data.rememberMe ?? true);
+      // Configurer la persistance avant la connexion (toujours sécurisée)
+      // rememberMe est ignoré et browserSessionPersistence est utilisée
+      await this.configurePersistence();
 
       const userCredential = await signInWithEmailAndPassword(
         auth,
@@ -242,10 +250,28 @@ export class AuthService {
 
   /**
    * Nettoyer les données utilisateur du localStorage
+   * IMPORTANT: Appelé lors du logout
    */
   static clearLocalStorage(): void {
     localStorage.removeItem('fleetnexus_user');
     localStorage.removeItem('fleetnexus_token');
+    // Nettoyer aussi sessionStorage par sécurité
+    sessionStorage.removeItem('fleetnexus_user');
+    sessionStorage.removeItem('fleetnexus_token');
+  }
+
+  /**
+   * Obtenir les informations de session actuelles
+   */
+  static getSessionInfo() {
+    const user = localStorage.getItem('fleetnexus_user');
+    const token = localStorage.getItem('fleetnexus_token');
+    
+    return {
+      hasSession: !!(user && token),
+      user: user ? JSON.parse(user) : null,
+      hasValidToken: !!token,
+    };
   }
 }
 

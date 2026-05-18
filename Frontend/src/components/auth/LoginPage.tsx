@@ -294,15 +294,12 @@ export function LoginPage({ onLogin }: LoginPageProps) {
           {/* Remember Me (Sign In only) */}
           {!isSignUp && (
             <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 text-sm text-text-secondary cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-4 h-4 rounded border-border bg-background-secondary text-accent-cyan focus:ring-accent-cyan/20"
-                />
-                Se souvenir de moi
-              </label>
+              <div className="text-sm text-text-secondary">
+                <p className="mb-1">🔒 Sécurité de la session:</p>
+                <p className="text-xs text-text-secondary/80">
+                  Votre session expirera après 30 min d'inactivité ou à la fermeture du navigateur
+                </p>
+              </div>
               <button
                 type="button"
                 onClick={handleResetPassword}
@@ -355,13 +352,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
           {/* Demo Credentials (Sign In only) */}
           {!isSignUp && (
             <div className="pt-4 border-t border-border">
-              <p className="text-xs text-text-secondary text-center mb-2">
-                Comptes de démonstration:
-              </p>
-              <div className="space-y-1 text-xs text-text-secondary/70 text-center">
-                <p>Manager: manager@fleetnexus.ng / manager123</p>
-                <p>Driver: driver1@fleetnexus.ng / driver123</p>
-              </div>
+             
             </div>
           )}
         </motion.form>

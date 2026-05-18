@@ -3,7 +3,7 @@
 // Credentials du projet geoconsulting-fleet
 
 import { initializeApp } from 'firebase/app';
-import { getAuth, setPersistence, browserLocalPersistence } from 'firebase/auth';
+import { getAuth, setPersistence, browserSessionPersistence } from 'firebase/auth';
 import { getFirestore, connectFirestoreEmulator, enableNetwork } from 'firebase/firestore';
 
 interface FirebaseEnvironmentConfig {
@@ -41,7 +41,12 @@ export const db = getFirestore(app);
 auth.useDeviceLanguage();
 
 // Configurer la persistance de session par défaut
-setPersistence(auth, browserLocalPersistence).catch((error) => {
+// IMPORTANT: browserSessionPersistence = session effacée à fermeture du navigateur (sécurisé)
+// Cela implique:
+// - localStorage et sessionStorage sont nettoyés à la fermeture complète du navigateur
+// - L'utilisateur doit se reconnecter après un redémarrage du navigateur
+// - Meilleure sécurité pour une application professionnelle
+setPersistence(auth, browserSessionPersistence).catch((error) => {
   console.error('Erreur configuration persistance Firebase Auth:', error);
 });
 

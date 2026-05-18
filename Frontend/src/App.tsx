@@ -4,6 +4,8 @@ import { AuthProvider, useAuth } from '@/context/AuthContext_Firebase';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { TruckLoader } from '@/components/common/TruckLoader';
 import { LoginPage } from '@/components/auth/LoginPage';
+import { SessionTimeoutAlert } from '@/components/session/SessionTimeoutAlert';
+import { SessionDebugOverlay } from '@/components/session/SessionDebugInfo';
 import { NavigationRail } from '@/components/layout/NavigationRail';
 import { TopBar } from '@/components/layout/TopBar';
 import { DashboardView } from '@/components/dashboard/DashboardView';
@@ -120,41 +122,49 @@ function AppContent() {
 
   // Render based on authentication status
   return (
-    <AnimatePresence mode="wait">
-      {!isAuthenticated ? (
-        <motion.div
-          key="login"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.3 }}
-        >
-          <LoginPage onLogin={() => {
-            console.log('✅ Login successful, AppContent will re-render');
-          }} />
-        </motion.div>
-      ) : user?.role === 'driver' ? (
-        <motion.div
-          key="driver-dashboard"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.3 }}
-        >
-          <DriverDashboard />
-        </motion.div>
-      ) : (
-        <motion.div
-          key="manager-dashboard"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.3 }}
-        >
-          {renderManagerDashboard()}
-        </motion.div>
-      )}
-    </AnimatePresence>
+    <>
+      <AnimatePresence mode="wait">
+        {!isAuthenticated ? (
+          <motion.div
+            key="login"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            <LoginPage onLogin={() => {
+              console.log('✅ Login successful, AppContent will re-render');
+            }} />
+          </motion.div>
+        ) : user?.role === 'driver' ? (
+          <motion.div
+            key="driver-dashboard"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            <DriverDashboard />
+          </motion.div>
+        ) : (
+          <motion.div
+            key="manager-dashboard"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            {renderManagerDashboard()}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Session Timeout Alert - affiché pour tous les utilisateurs authentifiés */}
+      {isAuthenticated && <SessionTimeoutAlert />}
+
+      {/* Debug Info - visible en développement uniquement */}
+      <SessionDebugOverlay />
+    </>
   );
 }
 

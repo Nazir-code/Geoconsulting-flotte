@@ -1,12 +1,13 @@
 // context/AuthContext_Firebase.tsx
 // Contexte d'authentification Firebase avec gestion complète des erreurs
-// Remplace complètement le système d'authentification mocké
+// + Session monitoring avec timeout d'inactivité
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth } from '@/lib/firebaseConfig';
 import { AuthService, SignInData, SignUpData } from '@/services/authService';
 import { FirestoreDriverService } from '@/services/firestoreDriverService';
+import { SessionManager, SessionEvent } from '@/services/sessionManager';
 import type { User, AuthState } from '@/types';
 
 interface AuthContextType extends AuthState {
@@ -16,6 +17,9 @@ interface AuthContextType extends AuthState {
   resetPassword: (email: string) => Promise<void>;
   updateUser: (user: Partial<User>) => void;
   refreshToken: () => Promise<void>;
+  sessionWarning: boolean;
+  sessionTimeoutWarning: boolean;
+  timeUntilLogout: number;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -59,6 +63,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
 
   const [error, setError] = useState<string | null>(null);
+  const [sessionWarning, setSessionWarning] = useState(false);
+  const [sessionTimeoutWarning, setSessionTimeoutWarning] = useState(false);
+  const [timeUntilLogout, setTimeUntilLogout] = useState(0);
+  const sessionManager = SessionManager.getInstance();
 
   /**
    * Charger les données utilisateur depuis Firestore
@@ -237,6 +245,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setState(prev => ({ ...prev, isLoading: true }));
       setError(null);
+      
+      // Arrêter le monitoring de session
+      sessionManager.stop();
+      setSessionWarning(false);
+      setSessionTimeoutWarning(false);
 
       // Mettre à jour le statut hors ligne avant déconnexion
       if (state.user?.id) {
@@ -260,7 +273,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setError('Erreur lors de la déconnexion');
       setState(prev => ({ ...prev, isLoading: false }));
     }
-  }, [state.user?.id]);
+  }, [state.user?.id, sessionManager]);
 
   /**
    * Réinitialisation du mot de passe
@@ -316,6 +329,64 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [state.isAuthenticated, refreshToken]);
 
+  /**
+   * Gérer le session manager - monitoring d'inactivité
+   */
+  useEffect(() => {
+    if (state.isAuthenticated) {
+      // L'utilisateur vient de se connecter, démarrer le monitoring
+      console.log('🔐 Démarrage du monitoring de session (inactivité timeout)');
+      sessionManager.start();
+
+      // S'abonner aux événements de session
+      const unsubscribe = sessionManager.subscribe((event: SessionEvent) => {
+        console.log(`📊 Session event: ${event}`);
+        
+        switch (event) {
+          case 'warning':
+            // Afficher l'alerte 2 minutes avant expiration
+            console.warn('⏱️ Session sera expirée dans 2 minutes');
+            setSessionTimeoutWarning(true);
+            break;
+
+          case 'timeout':
+            // Logout automatique après 30 min d'inactivité
+            console.warn('⏱️ Session expirée - logout automatique');
+            setSessionTimeoutWarning(false);
+            signOut();
+            break;
+
+          case 'refresh':
+            // Session rafraîchie sur activité
+            setSessionTimeoutWarning(false);
+            break;
+
+          case 'activity':
+            // Activité détectée (mise à jour du compteur optionnel)
+            break;
+        }
+      });
+
+      // Mettre à jour le compteur de temps jusqu'au logout (pour l'UI)
+      const countdownInterval = setInterval(() => {
+        if (state.isAuthenticated) {
+          const timeLeft = sessionManager.getTimeUntilTimeoutSeconds();
+          setTimeUntilLogout(timeLeft);
+        }
+      }, 1000);
+
+      return () => {
+        unsubscribe();
+        clearInterval(countdownInterval);
+      };
+    } else {
+      // L'utilisateur est déconnecté, arrêter le monitoring
+      sessionManager.stop();
+      setSessionTimeoutWarning(false);
+      setTimeUntilLogout(0);
+    }
+  }, [state.isAuthenticated, sessionManager, signOut]);
+
   const contextValue: AuthContextType = {
     ...state,
     signIn,
@@ -324,6 +395,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     resetPassword,
     updateUser,
     refreshToken,
+    sessionWarning,
+    sessionTimeoutWarning,
+    timeUntilLogout,
   };
 
   return (

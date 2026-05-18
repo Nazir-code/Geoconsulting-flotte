@@ -16,3 +16,5 @@ firebase-*.json
 *~
 .env.production
 .env.staging
+.vercel
+.env*.local
