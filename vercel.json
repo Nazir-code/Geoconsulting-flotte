@@ -1,0 +1,16 @@
+{
+  "buildCommand": "cd Frontend && npm install && npm run build",
+  "outputDirectory": "Frontend/dist",
+  "framework": "vite",
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "https://geoconsulting-flotte-eo4etbyjq-nazirs-projects-b57e1afe.vercel.app/api/$1"
+    },
+    { "handle": "filesystem" },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ]
+}
