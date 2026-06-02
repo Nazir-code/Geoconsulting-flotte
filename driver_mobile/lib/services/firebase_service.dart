@@ -52,14 +52,14 @@ class FirebaseService {
     });
   }
 
-  /// Stream des missions en temps réel
-  Stream<QuerySnapshot> getMissionsStream({String? driverId}) {
+  /// Stream des missions en temps réel filtré par Firebase UID du chauffeur.
+  /// Paramètre renommé driverUid (Firebase UID) — champ Firestore: assignedTo.
+  Stream<QuerySnapshot> getMissionsStream({String? driverUid}) {
     Query query = _firestore.collection('missions');
-    
-    if (driverId != null) {
-      query = query.where('driverId', isEqualTo: driverId);
+    if (driverUid != null) {
+      // Le champ Firestore est 'assignedTo' (Firebase UID), pas 'driverId' (legacy backend ID)
+      query = query.where('assignedTo', isEqualTo: driverUid);
     }
-    
     return query.snapshots();
   }
 

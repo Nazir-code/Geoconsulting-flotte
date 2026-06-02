@@ -4,6 +4,7 @@ import { Wrench, AlertTriangle, CheckCircle, Clock, Plus } from 'lucide-react';
 import { dataService } from '@/services/dataService';
 import type { MaintenanceRecord } from '@/types';
 import { formatDate } from '@/lib/utils';
+import { StatusChip, EmptyState, Skeleton } from '@/components/common';
 
 interface MaintenancePanelProps {
   limit?: number;
@@ -50,45 +51,24 @@ export function MaintenancePanel({ limit = 5 }: MaintenancePanelProps) {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return 'text-green-600 dark:text-green-400';
-      case 'in_progress':
-        return 'text-blue-600 dark:text-blue-400';
-      case 'scheduled':
-        return 'text-yellow-600 dark:text-yellow-400';
-      case 'overdue':
-        return 'text-red-600 dark:text-red-400';
-      default:
-        return 'text-gray-600 dark:text-gray-400';
-    }
-  };
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return 'Terminée';
-      case 'in_progress':
-        return 'En cours';
-      case 'scheduled':
-        return 'Planifiée';
-      case 'overdue':
-        return 'En retard';
-      default:
-        return status;
-    }
-  };
-
   if (isLoading) {
     return (
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-background-secondary/50 backdrop-blur-xl rounded-xl border border-border p-6"
+        className="glass-card p-6"
       >
-        <div className="flex items-center justify-center h-32">
-          <div className="loading-spinner" />
+        <div className="flex items-center gap-3 mb-4">
+          <Skeleton variant="rect" className="w-9 h-9" />
+          <div className="space-y-2">
+            <Skeleton variant="text" className="w-32 h-4" />
+            <Skeleton variant="text" className="w-24" />
+          </div>
+        </div>
+        <div className="space-y-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} variant="rect" className="h-16" />
+          ))}
         </div>
       </motion.div>
     );
@@ -99,7 +79,7 @@ export function MaintenancePanel({ limit = 5 }: MaintenancePanelProps) {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      className="bg-background-secondary/50 backdrop-blur-xl rounded-xl border border-border p-6"
+      className="glass-card p-6"
     >
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
@@ -118,10 +98,11 @@ export function MaintenancePanel({ limit = 5 }: MaintenancePanelProps) {
 
       <div className="space-y-3">
         {maintenanceRecords.length === 0 ? (
-          <div className="text-center py-8">
-            <Wrench className="w-12 h-12 text-text-secondary/50 mx-auto mb-3" />
-            <p className="text-text-secondary">Aucune maintenance en cours</p>
-          </div>
+          <EmptyState
+            icon={Wrench}
+            title="Aucune maintenance en cours"
+            description="Les entretiens planifiés et en cours s'afficheront ici."
+          />
         ) : (
           maintenanceRecords.map((record, index) => (
             <motion.div
@@ -145,12 +126,10 @@ export function MaintenancePanel({ limit = 5 }: MaintenancePanelProps) {
                   </p>
                 </div>
               </div>
-              <div className="text-right">
-                <span className={`text-xs font-medium px-2 py-1 rounded-full ${getStatusColor(record.status)} bg-current/10`}>
-                  {getStatusText(record.status)}
-                </span>
+              <div className="text-right flex flex-col items-end gap-1">
+                <StatusChip status={record.status} size="sm" />
                 {record.cost && (
-                  <p className="text-xs text-text-secondary mt-1">
+                  <p className="text-xs text-text-secondary">
                     {record.cost.toLocaleString()} FCFA
                   </p>
                 )}

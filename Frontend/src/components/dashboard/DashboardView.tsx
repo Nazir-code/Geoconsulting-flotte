@@ -6,6 +6,9 @@ import { ActivityFeed } from './ActivityFeed';
 import { MapPanel } from './MapPanel';
 import { MissionStrip } from './MissionStrip';
 import { MaintenancePanel } from './MaintenancePanel';
+import { MissionsOverview } from './MissionsOverview';
+import { DriversOverview } from './DriversOverview';
+import { SkeletonKPICard } from '@/components/common';
 import { dataService } from '@/services/dataService';
 import { FirestoreDriverService } from '@/services/firestoreDriverService';
 import { FirestoreMissionService } from '@/services/firestoreMissionService';
@@ -23,6 +26,7 @@ export function DashboardView() {
   });
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [missions, setMissions] = useState<Mission[]>([]);
+  const [driverCounts, setDriverCounts] = useState({ active: 0, inactive: 0 });
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -31,6 +35,9 @@ export function DashboardView() {
 
     // 2. Écouter les chauffeurs en temps réel
     const unsubscribeDrivers = FirestoreDriverService.allDriversListener((drivers) => {
+      // Compteurs d'affichage dérivés du flux déjà abonné (présentation only).
+      const active = drivers.filter((d) => d.status === 'online').length;
+      setDriverCounts({ active, inactive: drivers.length - active });
       setStats(prev => ({
         ...prev,
         totalDrivers: drivers.length,
@@ -50,7 +57,7 @@ export function DashboardView() {
       setMissions(mappedMissions);
 
       const activeCount = mappedMissions.filter(m =>
-        m.status === 'in_progress' || m.status === 'pending'
+        m.status === 'en_cours' || m.status === 'assignée' || m.status === 'en_attente'
       ).length;
 
       setStats(prev => ({
@@ -65,7 +72,7 @@ export function DashboardView() {
         .map(m => ({
           id: `act-${m.id}`,
           type: 'mission',
-          title: m.status === 'completed' ? 'Mission Terminée' : 'Nouvelle Mission',
+          title: m.status === 'terminée' ? 'Mission Terminée' : 'Nouvelle Mission',
           description: `${m.title || 'Mission'} vers ${m.location || 'N/A'}`,
           timestamp: m.updatedAt?.toDate?.()?.toISOString() || new Date().toISOString(),
         }));
@@ -101,8 +108,16 @@ export function DashboardView() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="loading-spinner" />
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <SkeletonKPICard key={i} />
+          ))}
+        </div>
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          <div className="xl:col-span-2 glass-card h-80" />
+          <div className="glass-card h-80" />
+        </div>
       </div>
     );
   }
@@ -156,6 +171,12 @@ export function DashboardView() {
           color="orange"
           delay={0.4}
         />
+      </div>
+
+      {/* Vue d'ensemble : répartition missions + chauffeurs actifs/inactifs */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <MissionsOverview missions={missions} />
+        <DriversOverview active={driverCounts.active} inactive={driverCounts.inactive} />
       </div>
 
       {/* Main Content Grid */}

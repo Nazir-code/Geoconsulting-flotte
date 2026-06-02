@@ -11,7 +11,7 @@ class Mission {
   final String priority; // low, medium, high
   final String location;
   final String assignedTo; // UID du chauffeur
-  final String status; // pending, in_progress, completed
+  final String status; // en_attente, assignée, en_cours, terminée, annulée
   final String createdBy; // UID du manager
   final Timestamp createdAt;
   final Timestamp? assignedAt;
@@ -44,7 +44,7 @@ class Mission {
       priority: json['priority'] ?? 'medium',
       location: json['location'] ?? '',
       assignedTo: json['assignedTo'] ?? '',
-      status: json['status'] ?? 'pending',
+      status: _normalizeStatus(json['status'] as String?),
       createdBy: json['createdBy'] ?? '',
       createdAt: json['createdAt'] ?? Timestamp.now(),
       assignedAt: json['assignedAt'],
@@ -108,4 +108,19 @@ class Mission {
 
   @override
   String toString() => 'Mission(id: $id, title: $title, status: $status)';
+
+  static String _normalizeStatus(String? status) {
+    switch (status) {
+      case 'pending':
+        return 'en_attente';
+      case 'in_progress':
+        return 'en_cours';
+      case 'completed':
+        return 'terminée';
+      case 'cancelled':
+        return 'annulée';
+      default:
+        return status ?? 'en_attente';
+    }
+  }
 }

@@ -3,7 +3,7 @@
 
 import { collection, query, where, getDocs, doc, setDoc, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebaseConfig';
-import { FirestoreMissionService, type Mission } from './firestoreMissionService';
+import { toStorageStatus } from './firestoreMissionService';
 
 /**
  * Trouver un driver par email et retourner son UID Firebase
@@ -84,7 +84,8 @@ export async function createMissionWithFirebaseUid(
       priority,
       assignedTo: driverUid, // ✅ UID FIREBASE, pas ID mock!
       createdBy,
-      status: 'pending',
+      // Statut canonique ANGLAIS attendu par le trigger FCM + l'app mobile.
+      status: toStorageStatus('assignée'), // -> 'pending'
       createdAt: timestamp,
       updatedAt: timestamp,
     };

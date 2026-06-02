@@ -27,9 +27,9 @@ export function DriverDashboard() {
       
       if (driver) {
         const missions = await dataService.getMissions({ driverId: driver.id });
-        const active = missions.find(m => m.status === 'in_progress');
+        const active = missions.find(m => m.status === 'en_cours');
         setActiveMission(active || null);
-        setMissionHistory(missions.filter(m => m.status !== 'in_progress').slice(0, 5));
+        setMissionHistory(missions.filter(m => m.status !== 'en_cours').slice(0, 5));
       }
     } catch (error) {
       console.error('Error loading driver data:', error);
@@ -308,7 +308,7 @@ export function DriverDashboard() {
                   {mission.destination}
                 </span>
                 <span className={`px-2 py-0.5 rounded text-xs ${
-                  mission.status === 'completed' 
+                  mission.status === 'terminée' 
                     ? 'bg-emerald-500/20 text-emerald-400' 
                     : 'bg-red-500/20 text-red-400'
                 }`}>

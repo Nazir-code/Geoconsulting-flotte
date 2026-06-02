@@ -14,6 +14,7 @@ class AuthService {
 
   /// Connexion avec Email / Mot de passe
   /// Met automatiquement le statut à "online" dans Firestore
+  /// Enregistre également le Firebase UID pour la synchronisation avec le backend
   Future<User?> signIn(String email, String password) async {
     try {
       UserCredential result = await _auth.signInWithEmailAndPassword(
@@ -39,6 +40,9 @@ class AuthService {
           status: 'online',
         );
         print('✅ [AuthService] Statut "online" défini dans Firestore');
+
+        // 🔐 SYNCHRONISATION FIREBASE UID: Enregistrer le Firebase UID pour le backend
+        await _firestoreService.registerFirebaseUidWithBackend(user.uid);
       }
       return user;
     } on FirebaseAuthException catch (e) {

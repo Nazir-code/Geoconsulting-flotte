@@ -60,7 +60,7 @@ interface MapPanelProps {
 
 export function MapPanel({ missions }: MapPanelProps) {
   // Filtrer les missions en cours pour afficher les véhicules actifs
-  const activeMissions = missions.filter(m => m.status === 'in_progress');
+  const activeMissions = missions.filter(m => m.status === 'en_cours');
   
   // Créer des positions mockées basées sur les missions actives (utilise useMemo pour éviter les re-renders)
   const vehiclePositions = useMemo(() => {

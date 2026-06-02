@@ -149,6 +149,14 @@ export class FirestoreDriverService {
       updatedAt: FirestoreService.getServerTimestamp(),
     });
   }
+
+  /**
+   * Supprimer un driver (document Firestore)
+   */
+  static async deleteDriver(uid: string): Promise<void> {
+    const driverPath = `${this.DRIVERS_COLLECTION}/${uid}`;
+    await FirestoreService.deleteDocument(driverPath);
+  }
 }
 
 export default FirestoreDriverService;

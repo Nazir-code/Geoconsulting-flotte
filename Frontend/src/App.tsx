@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AuthProvider, useAuth } from '@/context/AuthContext_Firebase';
 import { ThemeProvider } from '@/context/ThemeContext';
+import { ToastProvider } from '@/components/common';
 import { TruckLoader } from '@/components/common/TruckLoader';
 import { LoginPage } from '@/components/auth/LoginPage';
 import { SessionTimeoutAlert } from '@/components/session/SessionTimeoutAlert';
@@ -13,7 +14,6 @@ import { FleetView } from '@/components/fleet/FleetView';
 import { MissionsView } from '@/components/missions/MissionsView';
 import { FuelView } from '@/components/fuel/FuelView';
 import { ReportsView } from '@/components/reports/ReportsView';
-import { DriverDashboard } from '@/components/driver/DriverDashboard';
 import { SettingsView } from '@/components/settings/SettingsView';
 
 
@@ -29,7 +29,7 @@ const sectionTitles: Record<string, string> = {
 
 function AppContent() {
   console.log('🎯 AppContent component mounted');
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [showLoader, setShowLoader] = useState(true);
   const [activeSection, setActiveSection] = useState('dashboard');
 
@@ -136,16 +136,6 @@ function AppContent() {
               console.log('✅ Login successful, AppContent will re-render');
             }} />
           </motion.div>
-        ) : user?.role === 'driver' ? (
-          <motion.div
-            key="driver-dashboard"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
-          >
-            <DriverDashboard />
-          </motion.div>
         ) : (
           <motion.div
             key="manager-dashboard"
@@ -173,7 +163,9 @@ function App() {
   return (
     <AuthProvider>
       <ThemeProvider>
-        <AppContent />
+        <ToastProvider>
+          <AppContent />
+        </ToastProvider>
       </ThemeProvider>
     </AuthProvider>
   );

@@ -85,7 +85,7 @@ export function NavigationRail({ activeSection, onSectionChange }: NavigationRai
               )}
 
               {/* Tooltip */}
-              <div className="absolute left-full ml-3 px-2 py-1 bg-background-secondary border border-border rounded-lg text-xs text-text-primary whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+              <div className="absolute left-full ml-3 px-2.5 py-1.5 rounded-lg text-xs font-medium text-accent-cyan bg-background-secondary/95 backdrop-blur-sm border border-accent-cyan/30 shadow-lg shadow-accent-cyan/10 whitespace-nowrap opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-200 ease-out pointer-events-none z-50">
                 {item.label}
               </div>
             </motion.button>
@@ -105,7 +105,7 @@ export function NavigationRail({ activeSection, onSectionChange }: NavigationRai
           className="w-5 h-5 text-text-secondary group-hover:text-red-400 transition-colors" 
           strokeWidth={1.5} 
         />
-        <div className="absolute left-full ml-3 px-2 py-1 bg-background-secondary border border-border rounded-lg text-xs text-text-primary whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+        <div className="absolute left-full ml-3 px-2.5 py-1.5 rounded-lg text-xs font-medium text-accent-cyan bg-background-secondary/95 backdrop-blur-sm border border-accent-cyan/30 shadow-lg shadow-accent-cyan/10 whitespace-nowrap opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-200 ease-out pointer-events-none z-50">
           Déconnexion
         </div>
       </motion.button>

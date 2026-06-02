@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Satellite, AlertCircle, Radio } from 'lucide-react';
 import { LiveMap } from './LiveMap';
 import { TrackingPanel } from './TrackingPanel';
 import { FirestoreDriverService } from '@/services/firestoreDriverService';
+import { EmptyState } from '@/components/common';
 import type { LivePosition } from '@/services/gpsSimulatorService';
 import type { Mission } from '@/types';
 
@@ -17,28 +18,59 @@ export function LiveTrackingView({ missions }: LiveTrackingViewProps) {
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [refreshCountdown, setRefreshCountdown] = useState(3);
-  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Missions en cours uniquement
-  const activeMissions = missions.filter((m) => m.status === 'in_progress');
+  // Missions actives — mémoïsées pour éviter une nouvelle référence à chaque render
+  const activeMissions = useMemo(() =>
+    missions.filter((m) =>
+      (m.status as string) === 'en_cours' ||
+      (m.status as string) === 'assignée' ||
+      (m.status as string) === 'in_progress'
+    ),
+    [missions]
+  );
 
-  // Abonnement aux positions GPS réelles via Firestore Drivers
+  // Ref stable vers activeMissions : le listener y accède sans rouvrir la subscription
+  // Garantit que N chauffeurs simultanés ne provoquent pas de re-subscription en boucle
+  const activeMissionsRef = useRef(activeMissions);
+  useEffect(() => {
+    activeMissionsRef.current = activeMissions;
+  }, [activeMissions]);
+
+  // Abonnement unique aux positions GPS de TOUS les chauffeurs en ligne
+  // La subscription est ouverte une seule fois (deps: []) et reste stable
+  // même quand les missions ou les positions d'autres chauffeurs changent.
   useEffect(() => {
     const unsubscribe = FirestoreDriverService.onlineDriversListener((drivers) => {
+      console.log(`📡 [LiveTracking] ${drivers.length} chauffeur(s) en ligne.`);
+
+      // Snapshot courant des missions actives — sans déclencher de re-subscription
+      const currentMissions = activeMissionsRef.current;
+
       const newPositions: LivePosition[] = drivers
-        .filter(d => d.latitude && d.longitude) // Seulement ceux qui ont une position
+        .filter(d => d.latitude !== undefined && d.longitude !== undefined)
+        // Un véhicule n'est affiché comme actif QUE si le chauffeur a une mission en cours.
+        // Signal d'autorité : drivers/{uid}.currentMission (positionné à l'acceptation,
+        // remis à null à la fin/annulation par la transaction atomique des missions).
+        // Fallback : une mission active référençant ce chauffeur (m.driverId === d.uid).
+        // Sinon, le chauffeur peut être "online" (GPS encore actif) sans mission → on le cache.
+        .filter(d => {
+          const hasCurrentMission = typeof d.currentMission === 'string' && d.currentMission.length > 0;
+          const hasActiveMission = currentMissions.some((m) => m.driverId === d.uid);
+          return hasCurrentMission || hasActiveMission;
+        })
         .map(d => {
-          // Trouver la mission correspondante pour ce driver
-          const mission = activeMissions.find(m => m.driverId === d.id || m.driverId === d.uid);
-          
+          // Associer chaque chauffeur (uid = Firebase UID) à sa mission active
+          // m.driverId est mappé depuis mission.assignedTo (= Firebase UID du chauffeur)
+          const mission = currentMissions.find((m) => m.driverId === d.uid);
+
           return {
-            vehicleId: d.currentMission ? d.currentMission : (mission?.vehicleId || `v-${d.id}`),
+            vehicleId: d.currentMission || (mission?.vehicleId || `v-${d.uid || d.id}`),
             missionId: d.currentMission || mission?.id || '',
             lat: d.latitude!,
             lng: d.longitude!,
-            speed: (d as any).speed || 0,
-            heading: (d as any).heading || 0,
-            progress: (d as any).progress || 0,
+            speed: (d as unknown as { speed?: number }).speed || 0,
+            heading: (d as unknown as { heading?: number }).heading || 0,
+            progress: (d as unknown as { progress?: number }).progress || 0,
             distanceDone: 0,
             distanceTotal: 0,
             eta: 0,
@@ -50,7 +82,7 @@ export function LiveTrackingView({ missions }: LiveTrackingViewProps) {
       setLastUpdate(new Date());
       setRefreshCountdown(3);
 
-      // Pour les traces, on pourrait les stocker dans Firestore aussi, mais pour l'instant on garde une trace locale
+      // Traces par vehicleId — chaque chauffeur a sa propre trace indépendante
       setTrails(prev => {
         const updatedTrails = { ...prev };
         newPositions.forEach(p => {
@@ -65,39 +97,23 @@ export function LiveTrackingView({ missions }: LiveTrackingViewProps) {
     });
 
     return () => unsubscribe();
-  }, [activeMissions]);
-
-  // Countdown visuel pour simuler l'attente de la prochaine synchro
-  useEffect(() => {
-    countdownRef.current = setInterval(() => {
-      setRefreshCountdown((prev) => (prev <= 1 ? 3 : prev - 1));
-    }, 1000);
-    return () => {
-      if (countdownRef.current) clearInterval(countdownRef.current);
-    };
+  // Subscription ouverte une seule fois — activeMissions accessible via activeMissionsRef
   }, []);
 
-  if (activeMissions.length === 0) {
+  // On affiche la carte si on a des positions OU des missions actives
+  if (activeMissions.length === 0 && positions.length === 0) {
     return (
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col items-center justify-center py-20 gap-4"
-      >
-        <div className="w-16 h-16 rounded-2xl bg-background-secondary flex items-center justify-center">
-          <Satellite className="w-8 h-8 text-text-secondary/30" />
-        </div>
-        <div className="text-center">
-          <p className="text-text-secondary font-medium mb-1">Aucune mission en cours sur Firestore</p>
-          <p className="text-text-secondary/50 text-sm">
-            Les véhicules en mission apparaîtront ici dès que les drivers seront en ligne
-          </p>
-        </div>
-        <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs">
-          <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
-          <span>Connectez-vous sur l'application mobile pour activer le suivi GPS</span>
-        </div>
-      </motion.div>
+      <EmptyState
+        icon={Satellite}
+        title="Aucune mission en cours"
+        description="Les véhicules en mission apparaîtront ici dès qu'un chauffeur en accepte une et passe en ligne."
+        action={
+          <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs">
+            <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+            <span>Connectez-vous sur l'application mobile pour activer le suivi GPS</span>
+          </div>
+        }
+      />
     );
   }
 
@@ -136,11 +152,9 @@ export function LiveTrackingView({ missions }: LiveTrackingViewProps) {
             positions={positions}
             missions={activeMissions}
             selectedVehicleId={selectedVehicleId}
-            isPaused={false}
             lastUpdate={lastUpdate}
             refreshCountdown={refreshCountdown}
             onSelectVehicle={setSelectedVehicleId}
-            onTogglePause={() => {}}
           />
         </div>
       </div>

@@ -182,15 +182,27 @@ function MissionCard({
   loading: boolean;
 }) {
   const statusColors = {
+    en_attente: { bg: 'bg-yellow-50', text: 'text-yellow-700', badge: 'bg-yellow-200' },
+    assignée: { bg: 'bg-indigo-50', text: 'text-indigo-700', badge: 'bg-indigo-200' },
+    en_cours: { bg: 'bg-blue-50', text: 'text-blue-700', badge: 'bg-blue-200' },
+    terminée: { bg: 'bg-green-50', text: 'text-green-700', badge: 'bg-green-200' },
+    annulée: { bg: 'bg-red-50', text: 'text-red-700', badge: 'bg-red-200' },
     pending: { bg: 'bg-yellow-50', text: 'text-yellow-700', badge: 'bg-yellow-200' },
     in_progress: { bg: 'bg-blue-50', text: 'text-blue-700', badge: 'bg-blue-200' },
     completed: { bg: 'bg-green-50', text: 'text-green-700', badge: 'bg-green-200' },
+    cancelled: { bg: 'bg-red-50', text: 'text-red-700', badge: 'bg-red-200' },
   };
 
   const statusLabels = {
+    en_attente: 'En attente',
+    assignée: 'Assignée',
+    en_cours: 'En cours',
+    terminée: 'Terminée',
+    annulée: 'Annulée',
     pending: 'En attente',
     in_progress: 'En cours',
     completed: 'Complétée',
+    cancelled: 'Annulée',
   };
 
   const priorityColors = {

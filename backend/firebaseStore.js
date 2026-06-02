@@ -233,14 +233,30 @@ async function createMissionForUser(userId, payload) {
     throw new Error('Véhicule introuvable.');
   }
 
+  // En production multi-chauffeurs, assignedTo DOIT être le Firebase UID.
+  // L'app mobile filtre les missions par where('assignedTo', isEqualTo: firebaseUid).
+  // Si firebaseUid n'est pas enregistré, la mission sera invisible sur l'app mobile.
+  if (!driver.firebaseUid) {
+    throw new Error(
+      `Firebase UID non enregistré pour le chauffeur ${driver.id}. ` +
+      `Le chauffeur doit se connecter sur l'app mobile au moins une fois avant de recevoir une mission.`
+    );
+  }
+
   const mission = {
     driverId: driver.id,
+    assignedTo: driver.firebaseUid,  // Firebase UID — seule valeur valide pour l'app mobile
     vehicleId: vehicle.id,
     destination: String(payload.destination || '').trim(),
     purpose: String(payload.purpose || '').trim(),
+    title: `Livraison vers ${String(payload.destination || '').trim()}`,
+    description: String(payload.purpose || '').trim(),
+    location: String(payload.destination || '').trim(),
+    priority: payload.priority || 'medium',
     startTime: payload.startTime || nowIso(),
-    status: 'in_progress',
+    status: 'pending',
     startLocation: String(payload.startLocation || 'Niamey').trim(),
+    createdBy: driver.userId,
     createdAt: nowIso(),
     updatedAt: nowIso(),
   };
@@ -250,8 +266,21 @@ async function createMissionForUser(userId, payload) {
   }
 
   try {
+    console.log('\n📝 [CREATE_MISSION] Initialisation de la création de mission');
+    console.log(`   ├─ userId (from token): ${userId}`);
+    console.log(`   ├─ driver.id (Firestore doc ID): ${driver.id}`);
+    console.log(`   ├─ driver.userId: ${driver.userId}`);
+    console.log(`   ├─ driver.firebaseUid: ${driver.firebaseUid ? driver.firebaseUid.substring(0, 25) + '...' : '❌ NON ENREGISTRÉ'}`);
+    console.log(`   ├─ assignedTo (value used): ${mission.assignedTo.substring(0, 25)}...`);
+    console.log(`   │  └─ Raison: ${driver.firebaseUid ? '✅ Firebase UID disponible' : '⚠️  Firebase UID non enregistré, utilise driver.id'}`);
+    console.log(`   └─ destination: ${mission.destination}`);
+    
     // Add mission to Firestore
     const missionRef = await db.collection(COLLECTIONS.MISSIONS).add(mission);
+    console.log(`\n✅ [CREATE_MISSION] Mission créée dans Firestore!`);
+    console.log(`   ├─ Mission ID: ${missionRef.id}`);
+    console.log(`   ├─ assignedTo: ${mission.assignedTo}`);
+    console.log(`   └─ Mobile cherchera: .where('assignedTo', isEqualTo: "${mission.assignedTo}")`);
     
     // Update driver status
     await db.collection(COLLECTIONS.DRIVERS).doc(driver.id).update({
@@ -281,8 +310,11 @@ async function createMissionForUser(userId, payload) {
     try {
       const driverDoc = await db.collection(COLLECTIONS.DRIVERS).doc(driver.id).get();
       const driverData = driverDoc.data();
+      console.log(`📲 [FCM] Recherche de token FCM pour driver: ${driver.id}`);
+      console.log(`   ├─ fcmToken existe: ${!!driverData.fcmToken}`);
       
       if (driverData.fcmToken) {
+        console.log(`   ├─ Envoi FCM vers token: ${driverData.fcmToken.substring(0, 20)}...`);
         await admin.messaging().send({
           token: driverData.fcmToken,
           notification: {
@@ -304,10 +336,16 @@ async function createMissionForUser(userId, payload) {
             },
           },
         });
-        console.log('✅ FCM notification sent for mission start');
+        console.log('✅ [FCM] Notification FCM envoyée avec succès!');
+        console.log(`   └─ missionId: ${missionRef.id}`);
+      } else {
+        console.log('⚠️ [FCM] ❌ AUCUN TOKEN FCM trouvé pour ce driver!');
+        console.log(`   └─ Les notifications ne peuvent pas être envoyées`);
       }
     } catch (fcmError) {
-      console.error('❌ FCM send error:', fcmError.message);
+      console.error('❌ [FCM] Erreur lors de l\'envoi FCM:', fcmError.message);
+      console.error(`   ├─ Type: ${fcmError.code}`);
+      console.error(`   └─ Details: ${fcmError.toString()}`);
     }
 
     // Fetch and hydrate the created mission

@@ -1,15 +1,17 @@
 import { motion } from 'framer-motion';
-import { Phone, Star, Route, User, Calendar } from 'lucide-react';
+import { Phone, Star, Route, User, Calendar, Trash2 } from 'lucide-react';
 import type { Driver } from '@/types';
-import { formatNumber, getStatusColor, getStatusLabel } from '@/lib/utils';
+import { formatNumber } from '@/lib/utils';
+import { StatusChip } from '@/components/common';
 
 interface DriverCardProps {
   driver: Driver;
   index: number;
+  onDelete?: (uid: string) => void;
 }
 
-export function DriverCard({ driver, index }: DriverCardProps) {
-  const statusColor = getStatusColor(driver.status);
+export function DriverCard({ driver, index, onDelete }: DriverCardProps) {
+  const isActive = driver.status === 'active';
 
   return (
     <motion.div
@@ -34,7 +36,11 @@ export function DriverCard({ driver, index }: DriverCardProps) {
             </div>
           )}
         </div>
-        <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-background-primary bg-${statusColor}-500`} />
+        <div
+          className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-background-primary ${
+            isActive ? 'bg-emerald-500' : 'bg-slate-500'
+          }`}
+        />
       </div>
 
       {/* Info */}
@@ -43,9 +49,7 @@ export function DriverCard({ driver, index }: DriverCardProps) {
           <h3 className="text-sm font-medium text-text-primary truncate">
             {driver.user.firstName} {driver.user.lastName}
           </h3>
-          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium bg-${statusColor}-500/20 text-${statusColor}-400 border border-${statusColor}-500/30`}>
-            {getStatusLabel(driver.status)}
-          </span>
+          <StatusChip status={driver.status} size="sm" />
         </div>
 
         <div className="flex items-center gap-3 text-xs text-text-secondary">
@@ -97,6 +101,17 @@ export function DriverCard({ driver, index }: DriverCardProps) {
           </div>
         </div>
       )}
+
+      {/* Actions */}
+      <div className="flex items-start">
+        <button
+          onClick={() => onDelete?.(driver.user?.id || driver.userId || driver.id)}
+          title="Supprimer le chauffeur"
+          className="ml-3 p-2 rounded-md text-red-400 hover:bg-red-500/10 transition-colors"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      </div>
     </motion.div>
   );
 }

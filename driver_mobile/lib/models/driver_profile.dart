@@ -5,6 +5,7 @@ class DriverProfile {
   final String email;
   final String name;
   final String driverId;
+  final String status; // Ajout du status (online/offline)
   final double? latitude;
   final double? longitude;
   final DateTime? lastLocationUpdate;
@@ -14,6 +15,7 @@ class DriverProfile {
     required this.email,
     required this.name,
     required this.driverId,
+    required this.status,
     this.latitude,
     this.longitude,
     this.lastLocationUpdate,
@@ -31,6 +33,7 @@ class DriverProfile {
       email: data['email'] ?? '',
       name: data['name'] ?? '',
       driverId: data['driver_id'] ?? '',
+      status: data['status'] ?? 'offline',
       // Lit le nouveau schéma d'abord, puis fallback ancien schéma.
       latitude: (data['latitude'] as num?)?.toDouble() ?? (data['lat'] as num?)?.toDouble(),
       longitude: (data['longitude'] as num?)?.toDouble() ?? (data['lng'] as num?)?.toDouble(),
@@ -45,6 +48,7 @@ class DriverProfile {
       'email': email,
       'name': name,
       'driver_id': driverId,
+      'status': status,
       'latitude': latitude,
       'longitude': longitude,
       'lastLocationUpdate': lastLocationUpdate != null

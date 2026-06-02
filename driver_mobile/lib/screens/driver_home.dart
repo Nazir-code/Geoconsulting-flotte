@@ -1,12 +1,22 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:geolocator/geolocator.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
-import '../services/location_service.dart';
+import '../services/new_location_service.dart';
+import '../services/gps_lifecycle_manager.dart';
 import '../services/firebase_notification_service.dart';
 import '../models/driver_profile.dart';
+import '../widgets/kpi_card.dart';
+import '../widgets/status_switch.dart';
+import '../widgets/vehicle_status_card.dart';
+import '../widgets/quick_action_button.dart';
+import '../widgets/mission_card_pro.dart';
 import 'tracking_screen.dart';
+import '../theme/app_theme.dart';
 
 class DriverHome extends StatefulWidget {
   const DriverHome({super.key});
@@ -18,11 +28,20 @@ class DriverHome extends StatefulWidget {
 class _DriverHomeState extends State<DriverHome> {
   final AuthService _authService = AuthService();
   final FirestoreService _firestoreService = FirestoreService();
-  final LocationService _locationService = LocationService();
 
-  bool _isTracking = false;
+  bool _isOnline = false;
+  bool _isAcceptingMission = false;
   DriverProfile? _profile;
   StreamSubscription<QuerySnapshot>? _missionSubscription;
+  StreamSubscription<Position>? _gpsSubscription;
+  LatLng _currentLocation = const LatLng(13.5137, 2.1098);
+
+  // IDs des missions déjà présentes au démarrage du listener (snapshot initial).
+  // Approche par Set plutôt que comparaison de Timestamp — évite le décalage
+  // horloge device vs horloge serveur Firestore qui rendait le filtre précédent
+  // non fiable (missions créées dans la même seconde étaient silencieusement ignorées).
+  final Set<String> _knownMissionIds = {};
+  bool _isFirstMissionSnapshot = true;
 
   @override
   void initState() {
@@ -30,102 +49,35 @@ class _DriverHomeState extends State<DriverHome> {
     _loadProfile();
     _startMissionNotifications();
     _initMissionListener();
+
+    GpsLifecycleManager().onPermissionDenied = () {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Permissions GPS requises pour passer en ligne."),
+        ),
+      );
+      setState(() => _isOnline = false);
+    };
+
+    _gpsSubscription = NewLocationService().positionStream.listen((pos) {
+      if (mounted) {
+        setState(() => _currentLocation = LatLng(pos.latitude, pos.longitude));
+      }
+    });
+
+    final lastPos = NewLocationService().lastKnownPosition;
+    if (lastPos != null) {
+      _currentLocation = LatLng(lastPos.latitude, lastPos.longitude);
+    }
   }
 
   @override
   void dispose() {
-    _locationService.stopTracking();
+    _gpsSubscription?.cancel();
+    GpsLifecycleManager().onPermissionDenied = null;
     _missionSubscription?.cancel();
     super.dispose();
-  }
-
-  void _initMissionListener() {
-    final uid = _authService.currentUid;
-    debugPrint("DEBUG: Initialisation de l'écouteur de missions pour UID: $uid");
-
-    if (uid == null) {
-      debugPrint("DEBUG: UID est null. L'écouteur ne démarrera pas.");
-      return;
-    }
-
-    // Écoute les missions en temps réel
-    _missionSubscription = _firestoreService.listenToMissions(uid).listen((snapshot) {
-      debugPrint("DEBUG: Snapshot reçu. Nombre de documents: ${snapshot.docs.length}");
-
-      if (snapshot.docs.isNotEmpty) {
-        // On prend la mission la plus récente (en supposant qu'il n'y en a qu'une en pending)
-        final missionDoc = snapshot.docs.first;
-        final missionData = missionDoc.data() as Map<String, dynamic>;
-
-        debugPrint("DEBUG: Nouvelle mission détectée: ID=${missionDoc.id}, Titre=${missionData['title']}");
-
-        // Éviter d'afficher plusieurs fois la même alerte si possible
-        _showNewMissionDialog(missionDoc.id, missionData);
-      } else {
-        debugPrint("DEBUG: Aucune mission en attente trouvée pour cet UID.");
-      }
-    }, onError: (error) {
-      debugPrint("DEBUG: Erreur dans l'écouteur de missions: $error");
-    });
-  }
-
-  void _showNewMissionDialog(String missionId, Map<String, dynamic> data) {
-    if (!mounted) return;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false, // Force l'utilisateur à répondre
-      builder: (context) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 30),
-            SizedBox(width: 10),
-            Text("NOUVELLE MISSION !"),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text("📍 Lieu: ${data['location'] ?? 'Non spécifiée'}",
-                 style: const TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
-            Text("📝 Mission: ${data['title'] ?? 'Non spécifiée'}"),
-            if (data['description'] != null) ...[
-              const SizedBox(height: 5),
-              Text("ℹ️ ${data['description']}", style: const TextStyle(fontSize: 12, color: Colors.grey)),
-            ]
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("PLUS TARD"),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0E7490), foregroundColor: Colors.white),
-            onPressed: () {
-              // Optionnel: Passer la mission en 'in_progress' dans Firestore
-              _firestoreService.updateMissionStatus(missionId, 'in_progress');
-              Navigator.pop(context);
-              // Rediriger vers la carte de tracking
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const TrackingScreen()),
-              );
-            },
-            child: const Text("ACCEPTER & ALLER À LA CARTE"),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _startMissionNotifications() async {
-    final uid = _authService.currentUid;
-    if (uid != null) {
-      await FirebaseNotificationService.instance.startForDriver(uid);
-    }
   }
 
   Future<void> _loadProfile() async {
@@ -134,151 +86,639 @@ class _DriverHomeState extends State<DriverHome> {
       final p = await _firestoreService.getDriverProfile(uid);
       setState(() {
         _profile = p;
+        _isOnline = p?.status == 'online';
+        if (p != null && p.latitude != null && p.longitude != null) {
+          _currentLocation = LatLng(p.latitude!, p.longitude!);
+        }
       });
     }
   }
 
-  void _toggleTracking() async {
+  void _initMissionListener() {
     final uid = _authService.currentUid;
     if (uid == null) return;
 
-    if (_isTracking) {
-      _locationService.stopTracking();
-      setState(() => _isTracking = false);
-    } else {
-      try {
-        await _locationService.startTracking(uid);
-        setState(() => _isTracking = true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Tracking GPS activé")),
-        );
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
-        );
-      }
-    }
+    _missionSubscription = FirebaseFirestore.instance
+        .collection('missions')
+        .where('assignedTo', isEqualTo: uid)
+        .snapshots()
+        .listen(
+      (snapshot) {
+        // ── Premier snapshot : inventaire des missions existantes ─────────────
+        // Firestore renvoie TOUJOURS tous les documents correspondants en
+        // DocumentChangeType.added lors du premier snapshot. On les enregistre
+        // dans _knownMissionIds pour ne pas les confondre avec de nouvelles
+        // missions. Aucune notification n'est envoyée pour ce snapshot initial.
+        if (_isFirstMissionSnapshot) {
+          _isFirstMissionSnapshot = false;
+          for (final change in snapshot.docChanges) {
+            _knownMissionIds.add(change.doc.id);
+          }
+          debugPrint(
+            '🔍 [MissionListener] Snapshot initial: '
+            '${_knownMissionIds.length} missions existantes enregistrées, aucune notif.',
+          );
+          return;
+        }
+
+        // ── Snapshots suivants : uniquement les vraies nouveautés ─────────────
+        for (final change in snapshot.docChanges) {
+          if (change.type != DocumentChangeType.added) continue;
+
+          final docId = change.doc.id;
+
+          // Anti-doublon : ignorer si déjà connu
+          if (_knownMissionIds.contains(docId)) continue;
+          _knownMissionIds.add(docId);
+
+          final data = change.doc.data();
+
+          // Ignorer les missions déjà terminées ou annulées
+          final status = data?['status'] as String?;
+          if (status == 'completed' ||
+              status == 'terminée'  ||
+              status == 'cancelled' ||
+              status == 'annulée') {
+            debugPrint('🔍 [MissionListener] Mission $docId ignorée (statut: $status)');
+            continue;
+          }
+
+          debugPrint('🔔 [MissionListener] Nouvelle mission reçue: $docId (statut: $status)');
+
+          if (!mounted) return;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _showNewMissionDialog(docId, data ?? const {});
+          });
+        }
+      },
+      onError: (e) => debugPrint("❌ [MISSION ERROR] $e"),
+    );
+  }
+
+  void _toggleStatus(bool online) async {
+    setState(() => _isOnline = online);
+    await GpsLifecycleManager().setDriverOnline(online);
+  }
+
+  // ── Greeting ──────────────────────────────────────────────────────────────
+  String get _greeting {
+    final h = DateTime.now().hour;
+    if (h < 12) return "Bonjour";
+    if (h < 18) return "Bon après-midi";
+    return "Bonsoir";
   }
 
   @override
   Widget build(BuildContext context) {
-    const primaryColor = Color(0xFF0E7490);
-
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Tableau de Bord Chauffeur"),
-        backgroundColor: primaryColor,
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () => _authService.signOut(),
-          )
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        child: CustomScrollView(
+          physics: const BouncingScrollPhysics(),
+          slivers: [
+            _buildTopBar(),
+            _buildKpiSection(),
+            _buildVehicleSection(),
+            _buildQuickActions(),
+            _buildMapPreview(),
+            _buildRecentMissionsHeader(),
+            _buildRecentMissionsList(),
+            const SliverToBoxAdapter(child: SizedBox(height: 100)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Top Bar ───────────────────────────────────────────────────────────────
+  Widget _buildTopBar() {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+        child: Row(
+          children: [
+            // Avatar
+            GestureDetector(
+              onTap: () => DefaultTabController.of(context).animateTo(4),
+              child: Container(
+                padding: const EdgeInsets.all(2.5),
+                decoration: BoxDecoration(
+                  gradient: AppTheme.primaryGradient,
+                  shape: BoxShape.circle,
+                ),
+                child: const CircleAvatar(
+                  radius: 23,
+                  backgroundColor: AppColors.primaryLight,
+                  child: Icon(Icons.person_rounded, color: AppColors.primary, size: 26),
+                ),
+              ),
+            ),
+            const SizedBox(width: 14),
+            // Greeting
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _greeting,
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  Text(
+                    _profile?.name ?? "Chargement...",
+                    style: AppTextStyles.h4,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            // Status switch
+            StatusSwitch(isOnline: _isOnline, onChanged: _toggleStatus),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── KPI Grid ──────────────────────────────────────────────────────────────
+  Widget _buildKpiSection() {
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      sliver: SliverGrid.count(
+        crossAxisCount: 2,
+        mainAxisSpacing: 12,
+        crossAxisSpacing: 12,
+        childAspectRatio: 1.1,
+        children: const [
+          KpiCard(
+            title: "Missions / Jour",
+            value: "08",
+            icon: Icons.route_rounded,
+            trend: "+12%",
+          ),
+          KpiCard(
+            title: "KM Parcourus",
+            value: "1 240",
+            icon: Icons.speed_rounded,
+            iconColor: AppColors.warning,
+            trend: "+5%",
+          ),
         ],
       ),
-      body: _profile == null
-          ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Card(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                    elevation: 4,
-                    child: Padding(
-                      padding: const EdgeInsets.all(20.0),
-                      child: Column(
-                        children: [
-                          const CircleAvatar(
-                            radius: 40,
-                            backgroundColor: primaryColor,
-                            child: Icon(Icons.person, size: 50, color: Colors.white),
-                          ),
-                          const SizedBox(height: 15),
-                          Text(
-                            _profile!.name,
-                            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                          ),
-                          Text(
-                            _profile!.email,
-                            style: TextStyle(color: Colors.grey[600]),
-                          ),
-                          const SizedBox(height: 10),
-                          Chip(
-                            label: Text("ID: ${_profile!.driverId}"),
-                            backgroundColor: primaryColor.withOpacity(0.1),
-                          ),
-                        ],
+    );
+  }
+
+  // ── Vehicle Card ──────────────────────────────────────────────────────────
+  Widget _buildVehicleSection() {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+        child: VehicleStatusCard(
+          plateNumber: "ABC-123-NG",
+          model: "Toyota Hilux 4x4",
+          fuelLevel: 0.75,
+          isGpsActive: _isOnline,
+          lastSync: "À l'instant",
+        ),
+      ),
+    );
+  }
+
+  // ── Quick Actions ─────────────────────────────────────────────────────────
+  Widget _buildQuickActions() {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            QuickActionButton(
+              icon: Icons.assignment_outlined,
+              label: "Missions",
+              color: AppColors.primary,
+              onTap: () {},
+            ),
+            QuickActionButton(
+              icon: Icons.map_outlined,
+              label: "Carte Live",
+              color: AppColors.accent,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const TrackingScreen()),
+              ),
+            ),
+            QuickActionButton(
+              icon: Icons.history_rounded,
+              label: "Historique",
+              color: const Color(0xFF8B5CF6),
+              onTap: () {},
+            ),
+            QuickActionButton(
+              icon: Icons.qr_code_scanner_rounded,
+              label: "Scanner",
+              color: AppColors.warning,
+              onTap: () {},
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Map Preview ───────────────────────────────────────────────────────────
+  Widget _buildMapPreview() {
+    return SliverToBoxAdapter(
+      child: Container(
+        height: 180,
+        margin: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          borderRadius: AppSpacing.roundedXl2,
+          boxShadow: AppTheme.shadowMd,
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          children: [
+            FlutterMap(
+              options: MapOptions(
+                initialCenter: _currentLocation,
+                initialZoom: 13.0,
+                interactionOptions: const InteractionOptions(
+                  flags: InteractiveFlag.none,
+                ),
+              ),
+              children: [
+                TileLayer(
+                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  userAgentPackageName: 'com.novatech.driver_mobile',
+                ),
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: _currentLocation,
+                      child: Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          gradient: AppTheme.primaryGradient,
+                          shape: BoxShape.circle,
+                          boxShadow: AppTheme.shadowColored(AppColors.primary),
+                        ),
+                        child: const Icon(Icons.navigation_rounded, color: Colors.white, size: 18),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 30),
-                  const Text(
-                    "STATUT DU TRACKING GPS",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2),
-                  ),
-                  const SizedBox(height: 15),
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: _isTracking ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(15),
-                      border: Border.all(color: _isTracking ? Colors.green : Colors.red),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          _isTracking ? Icons.location_on : Icons.location_off,
-                          color: _isTracking ? Colors.green : Colors.red,
+                  ],
+                ),
+              ],
+            ),
+            // Gradient overlay
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.black.withValues(alpha: 0.45),
+                    Colors.transparent,
+                  ],
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                ),
+              ),
+            ),
+            // Bottom row
+            Positioned(
+              bottom: 12,
+              left: 16,
+              right: 16,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: _isOnline ? AppColors.success : AppColors.textSecondary,
+                          shape: BoxShape.circle,
                         ),
-                        const SizedBox(width: 10),
-                        Text(
-                          _isTracking ? "EN LIGNE - TRACKING ACTIF" : "HORS LIGNE - TRACKING ARRÊTÉ",
-                          style: TextStyle(
-                            color: _isTracking ? Colors.green : Colors.red,
-                            fontWeight: FontWeight.bold,
-                          ),
+                      ),
+                      const SizedBox(width: 6),
+                      const Text(
+                        "Position en temps réel",
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  const Spacer(),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const TrackingScreen()),
-                      );
-                    },
-                    icon: const Icon(Icons.map),
-                    label: const Text("VOIR LA CARTE DE TRACKING"),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange.shade700,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 15),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  GestureDetector(
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const TrackingScreen()),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  ElevatedButton.icon(
-                    onPressed: _toggleTracking,
-                    icon: Icon(_isTracking ? Icons.stop : Icons.play_arrow),
-                    label: Text(_isTracking ? "ARRÊTER LE SERVICE" : "DÉMARRER LE SERVICE"),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _isTracking ? Colors.red : primaryColor,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 20),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.15),
+                        borderRadius: AppSpacing.roundedMd,
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+                      ),
+                      child: const Text(
+                        "Plein écran",
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
+          ],
+        ),
+      ),
     );
   }
 
+  // ── Recent Missions ───────────────────────────────────────────────────────
+  Widget _buildRecentMissionsHeader() {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+        child: Row(
+          children: [
+            Text("Missions récentes", style: AppTextStyles.h4),
+            const Spacer(),
+            GestureDetector(
+              onTap: () {},
+              child: Text(
+                "Voir tout",
+                style: AppTextStyles.labelSm.copyWith(
+                  color: AppColors.primary,
+                  letterSpacing: 0.2,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
+  Widget _buildRecentMissionsList() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('missions')
+          .where('assignedTo', isEqualTo: _authService.currentUid)
+          .limit(3)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.all(20),
+              child: Center(
+                child: CircularProgressIndicator(
+                  color: AppColors.primary,
+                  strokeWidth: 2,
+                ),
+              ),
+            ),
+          );
+        }
+
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return SliverToBoxAdapter(
+            child: _buildEmptyMissions(),
+          );
+        }
+
+        return SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          sliver: SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                final doc = snapshot.data!.docs[index];
+                final data = {
+                  'id': doc.id,
+                  ...(doc.data() as Map<String, dynamic>),
+                };
+                return MissionCardPro(mission: data);
+              },
+              childCount: snapshot.data!.docs.length,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildEmptyMissions() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 28),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: AppSpacing.roundedLg,
+          border: Border.all(color: AppColors.borderLight),
+        ),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceVariant,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.assignment_outlined,
+                color: AppColors.textSecondary,
+                size: 28,
+              ),
+            ),
+            const SizedBox(height: 14),
+            Text("Aucune mission récente", style: AppTextStyles.h5),
+            const SizedBox(height: 6),
+            Text(
+              "Vos prochaines missions apparaîtront ici",
+              style: AppTextStyles.bodySm,
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── New Mission Dialog ────────────────────────────────────────────────────
+  void _showNewMissionDialog(String missionId, Map<String, dynamic> data) {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: AppSpacing.roundedXl2),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Icon
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  color: AppColors.warningLight,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.notifications_active_rounded,
+                  color: AppColors.warning,
+                  size: 36,
+                ),
+              ),
+              AppSpacing.gapLg,
+              Text("Nouvelle Mission !", style: AppTextStyles.h3),
+              AppSpacing.gapMd,
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceVariant,
+                  borderRadius: AppSpacing.roundedMd,
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.title_rounded, size: 16, color: AppColors.textSecondary),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            data['title'] ?? 'Sans titre',
+                            style: AppTextStyles.label,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const Icon(Icons.location_on_outlined, size: 16, color: AppColors.primary),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            data['location'] ?? 'N/A',
+                            style: AppTextStyles.bodySm,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              AppSpacing.gapXl2,
+              // Bouton Accepter — pleine largeur
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: _isAcceptingMission
+                      ? null
+                      : () => _acceptMissionFromDialog(missionId),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: AppSpacing.roundedMd),
+                  ),
+                  child: _isAcceptingMission
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Text(
+                          "Accepter",
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0,
+                          ),
+                        ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              // Bouton Ignorer — pleine largeur, discret
+              SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.textSecondary,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: AppSpacing.roundedMd),
+                  ),
+                  child: const Text(
+                    "Ignorer",
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 0,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _startMissionNotifications() async {
+    final uid = _authService.currentUid;
+    if (uid != null) await FirebaseNotificationService.instance.startForDriver(uid);
+  }
+
+  Future<void> _acceptMissionFromDialog(String missionId) async {
+    final uid = _authService.currentUid;
+    if (uid == null) return;
+
+    setState(() => _isAcceptingMission = true);
+    try {
+      await _firestoreService.acceptMission(uid: uid, missionId: missionId);
+      if (!mounted) return;
+      Navigator.pop(context);
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const TrackingScreen()),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur réseau: $error'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isAcceptingMission = false);
+    }
+  }
 }

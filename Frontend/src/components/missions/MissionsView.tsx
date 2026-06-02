@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Route, RefreshCw, Satellite, List } from 'lucide-react';
 import { MissionCard } from './MissionCard';
@@ -6,20 +6,25 @@ import { CreateMissionForm } from './CreateMissionForm';
 import { CreateMissionFirebaseForm } from './CreateMissionFirebaseForm';
 import { LiveTrackingView } from './LiveTrackingView';
 import { dataService } from '@/services/dataService';
-import { FirestoreMissionService } from '@/services/firestoreMissionService';
+import { FirestoreMissionService, normalizeMissionStatus } from '@/services/firestoreMissionService';
 import type { Mission, MissionStatus, Driver, Vehicle } from '@/types';
 import { cn } from '@/lib/utils';
+import { EmptyState, SkeletonList, useToast } from '@/components/common';
 
 type FilterStatus = 'all' | MissionStatus;
 type ActiveTab = 'missions' | 'tracking' | 'create-firebase';
 
 export function MissionsView() {
+  const toast = useToast();
   const [missions, setMissions] = useState<Mission[]>([]);
   const [filter, setFilter] = useState<FilterStatus>('all');
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<ActiveTab>('missions');
   const [allDrivers, setAllDrivers] = useState<Driver[]>([]);
   const [allVehicles, setAllVehicles] = useState<Vehicle[]>([]);
+
+  // Suivi des statuts précédents pour logger les transitions temps réel
+  const prevStatusesRef = useRef<Record<string, string>>({});
 
   // Charger les données de référence (drivers/vehicles) pour le mapping
   const loadReferenceData = useCallback(async () => {
@@ -99,12 +104,36 @@ export function MissionsView() {
           purpose: fm.title || fm.description || 'Mission de transport',
           startTime: fm.createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
           endTime: fm.completedAt?.toDate?.()?.toISOString(),
-          status: fm.status as MissionStatus,
+          status: normalizeMissionStatus(fm.status) as MissionStatus,
           startLocation: 'Niamey',
           createdAt: fm.createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
           updatedAt: fm.updatedAt?.toDate?.()?.toISOString() || new Date().toISOString(),
         };
       });
+
+      // ── Log temps réel : détecter les transitions de statut ──────────────
+      // Notamment les missions qui viennent de passer à "terminée" depuis le
+      // mobile (bouton "Terminer la mission" du chauffeur).
+      const prev = prevStatusesRef.current;
+      mappedMissions.forEach((m) => {
+        const before = prev[m.id];
+        if (before && before !== m.status) {
+          console.log(
+            `🔄 [Manager/Realtime] Mission ${m.id} : "${before}" → "${m.status}"`,
+            { destination: m.destination, driver: m.driverId }
+          );
+          if (m.status === 'terminée') {
+            console.log(
+              `✅ [Manager/Realtime] Mission TERMINÉE reçue en temps réel : ${m.id}`,
+              { endTime: m.endTime }
+            );
+          }
+        }
+      });
+      // Mémoriser les statuts courants pour la prochaine comparaison
+      prevStatusesRef.current = Object.fromEntries(
+        mappedMissions.map((m) => [m.id, m.status as string])
+      );
 
       setMissions(mappedMissions);
       setIsLoading(false);
@@ -121,28 +150,43 @@ export function MissionsView() {
     try {
       await FirestoreMissionService.completeMission(id);
       // Le state sera mis à jour via le listener
+      toast.success('Mission terminée', 'Le statut a été mis à jour en temps réel.');
     } catch (error) {
       console.error('Error completing mission:', error);
+      toast.error('Échec', "Impossible de terminer la mission.");
     }
   };
 
   const handleCancel = async (id: string) => {
     try {
-      await FirestoreMissionService.deleteMission(id); // On supprime ou annule selon le besoin
+      await FirestoreMissionService.cancelMission(id);
+      toast.warning('Mission annulée', 'La mission a été annulée.');
     } catch (error) {
       console.error('Error cancelling mission:', error);
+      toast.error('Échec', "Impossible d'annuler la mission.");
     }
   };
 
-  const filterButtons: { value: FilterStatus; label: string; count: number }[] = [
+  const legacyFilterButtons: Array<{ value: string; label: string; count: number }> = [
     { value: 'all', label: 'Toutes', count: missions.length },
-    { value: 'in_progress', label: 'En cours', count: missions.filter(m => m.status === 'in_progress').length },
-    { value: 'pending', label: 'Planifiées', count: missions.filter(m => m.status === 'pending').length },
-    { value: 'completed', label: 'Terminées', count: missions.filter(m => m.status === 'completed').length },
-    { value: 'cancelled', label: 'Annulées', count: missions.filter(m => m.status === 'cancelled').length },
+    { value: 'en_cours', label: 'En cours', count: missions.filter(m => String(m.status) === 'in_progress').length },
+    { value: 'pending', label: 'Planifiées', count: missions.filter(m => String(m.status) === 'pending').length },
+    { value: 'completed', label: 'Terminées', count: missions.filter(m => String(m.status) === 'completed').length },
+    { value: 'cancelled', label: 'Annulées', count: missions.filter(m => String(m.status) === 'cancelled').length },
   ];
 
-  const activeMissionsCount = missions.filter(m => m.status === 'in_progress').length;
+  void legacyFilterButtons;
+
+  const filterButtons: { value: FilterStatus; label: string; count: number }[] = [
+    { value: 'all', label: 'Toutes', count: missions.length },
+    { value: 'en_attente', label: 'En attente', count: missions.filter(m => m.status === 'en_attente').length },
+    { value: 'assignée', label: 'Acceptées', count: missions.filter(m => m.status === 'assignée').length },
+    { value: 'en_cours', label: 'En cours', count: missions.filter(m => m.status === 'en_cours').length },
+    { value: 'terminée', label: 'Terminées', count: missions.filter(m => m.status === 'terminée').length },
+    { value: 'annulée', label: 'Annulées', count: missions.filter(m => m.status === 'annulée').length },
+  ];
+
+  const activeMissionsCount = missions.filter(m => m.status === 'en_cours').length;
 
   // We remove the blocking loader so the UI shell renders instantly.
   // Data will pop in once Firestore responds.
@@ -283,20 +327,28 @@ export function MissionsView() {
 
                 {/* Mission Cards */}
                 <div className="space-y-3">
-                  {filteredMissions.map((mission, index) => (
-                    <MissionCard
-                      key={mission.id}
-                      mission={mission}
-                      index={index}
-                      onComplete={handleComplete}
-                      onCancel={handleCancel}
+                  {isLoading ? (
+                    <SkeletonList count={4} />
+                  ) : filteredMissions.length > 0 ? (
+                    filteredMissions.map((mission, index) => (
+                      <MissionCard
+                        key={mission.id}
+                        mission={mission}
+                        index={index}
+                        onComplete={handleComplete}
+                        onCancel={handleCancel}
+                      />
+                    ))
+                  ) : (
+                    <EmptyState
+                      icon={Route}
+                      title={filter === 'all' ? 'Aucune mission' : 'Aucune mission pour ce filtre'}
+                      description={
+                        filter === 'all'
+                          ? 'Créez une mission pour la voir apparaître ici en temps réel.'
+                          : 'Essayez un autre filtre ou créez une nouvelle mission.'
+                      }
                     />
-                  ))}
-                  {filteredMissions.length === 0 && (
-                    <div className="py-12 text-center">
-                      <Route className="w-12 h-12 text-text-secondary/30 mx-auto mb-4" />
-                      <p className="text-text-secondary">Aucune mission trouvée sur Firestore</p>
-                    </div>
                   )}
                 </div>
               </div>

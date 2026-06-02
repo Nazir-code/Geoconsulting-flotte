@@ -1,14 +1,15 @@
 import { motion } from 'framer-motion';
-import { ArrowRight, Clock } from 'lucide-react';
+import { ArrowRight, Clock, Route } from 'lucide-react';
 import type { Mission } from '@/types';
-import { formatTime, getStatusColor, getStatusLabel } from '@/lib/utils';
+import { formatTime } from '@/lib/utils';
+import { StatusChip, EmptyState } from '@/components/common';
 
 interface MissionStripProps {
   missions: Mission[];
 }
 
 export function MissionStrip({ missions }: MissionStripProps) {
-  const activeMissions = missions.filter(m => m.status === 'in_progress' || m.status === 'pending').slice(0, 4);
+  const activeMissions = missions.filter(m => m.status === 'en_cours' || m.status === 'assignée').slice(0, 4);
 
   return (
     <motion.div
@@ -28,12 +29,12 @@ export function MissionStrip({ missions }: MissionStripProps) {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {activeMissions.map((mission, index) => {
-          const statusColor = getStatusColor(mission.status);
           const driverUser = mission.driver?.user;
           const firstName = driverUser?.firstName || 'Chauffeur';
           const lastName = driverUser?.lastName || '';
           const initials = `${firstName[0] || 'C'}${lastName[0] || ''}`;
-          const destination = mission.destination || (mission as any).location || (mission as any).title || 'Destination';
+          const extra = mission as unknown as { location?: string; title?: string };
+          const destination = mission.destination || extra.location || extra.title || 'Destination';
           
           return (
             <motion.div
@@ -78,9 +79,7 @@ export function MissionStrip({ missions }: MissionStripProps) {
                   </span>
                 </div>
 
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium bg-${statusColor}-500/20 text-${statusColor}-400 border border-${statusColor}-500/30`}>
-                  {getStatusLabel(mission.status)}
-                </span>
+                <StatusChip status={mission.status} size="sm" />
               </div>
 
               {/* Time */}
@@ -93,8 +92,12 @@ export function MissionStrip({ missions }: MissionStripProps) {
         })}
 
         {activeMissions.length === 0 && (
-          <div className="col-span-full py-6 text-center text-text-secondary text-sm">
-            Aucune mission en cours
+          <div className="col-span-full">
+            <EmptyState
+              icon={Route}
+              title="Aucune mission en cours"
+              description="Les missions actives apparaîtront ici dès qu'un chauffeur en accepte une."
+            />
           </div>
         )}
       </div>

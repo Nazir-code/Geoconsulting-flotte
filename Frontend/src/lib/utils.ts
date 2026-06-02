@@ -81,10 +81,15 @@ export function getStatusColor(status: string): string {
     available: 'emerald',
     active: 'emerald',
     on_mission: 'cyan',
+    assignée: 'blue',
+    en_cours: 'cyan',
     in_progress: 'cyan',
     maintenance: 'orange',
+    en_attente: 'yellow',
     pending: 'yellow',
+    terminée: 'emerald',
     completed: 'emerald',
+    annulée: 'red',
     cancelled: 'red',
     unavailable: 'slate',
     off: 'slate',
@@ -98,6 +103,11 @@ export function getStatusColor(status: string): string {
 // Get status label in French
 export function getStatusLabel(status: string): string {
   const statusLabels: Record<string, string> = {
+    assignée: 'Acceptée',
+    en_cours: 'En cours',
+    en_attente: 'En attente',
+    terminée: 'Terminée',
+    annulée: 'Annulée',
     available: 'Disponible',
     active: 'Actif',
     on_mission: 'En mission',

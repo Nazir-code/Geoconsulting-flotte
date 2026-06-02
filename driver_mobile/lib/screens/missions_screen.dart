@@ -1,12 +1,10 @@
-// lib/screens/missions_screen.dart
-// Écran affichant les missions du chauffeur
-
 import 'package:flutter/material.dart';
-import '../models/mission_model.dart';
-import '../services/missions_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/auth_service.dart';
+import '../services/missions_service.dart';
+import '../theme/app_theme.dart';
+import '../widgets/mission_card_pro.dart';
 
-/// Écran affichant les missions assignées au chauffeur
 class MissionsScreen extends StatefulWidget {
   const MissionsScreen({super.key});
 
@@ -16,494 +14,429 @@ class MissionsScreen extends StatefulWidget {
 
 class _MissionsScreenState extends State<MissionsScreen>
     with SingleTickerProviderStateMixin {
-  late final MissionsService _missionsService = MissionsService();
-  late final AuthService _authService = AuthService();
-  late TabController _tabController;
+  final AuthService _authService = AuthService();
+  final MissionsService _missionsService = MissionsService();
 
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 3, vsync: this);
-  }
+  String _selectedFilter = 'all';
+  String? _busyMissionId;
 
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
+  static const _filters = [
+    (value: 'all',                              label: 'Toutes'),
+    (value: MissionsService.statusAssignee,     label: 'Assignées'),
+    (value: MissionsService.statusEnCours,      label: 'En cours'),
+    (value: MissionsService.statusTerminee,     label: 'Terminées'),
+    (value: MissionsService.statusAnnulee,      label: 'Annulées'),
+  ];
 
-  /// Formater le statut de mission
-  String _formatStatus(String status) {
-    switch (status) {
-      case 'pending':
-        return 'En attente';
-      case 'in_progress':
-        return 'En cours';
-      case 'completed':
-        return 'Complétée';
-      default:
-        return status;
-    }
-  }
-
-  /// Formater la priorité
-  String _formatPriority(String priority) {
-    switch (priority) {
-      case 'low':
-        return 'Basse';
-      case 'medium':
-        return 'Moyenne';
-      case 'high':
-        return 'Haute';
-      default:
-        return priority;
-    }
-  }
-
-  /// Couleur de priorité
-  Color _getPriorityColor(String priority) {
-    switch (priority) {
-      case 'low':
-        return Colors.blue;
-      case 'medium':
-        return Colors.orange;
-      case 'high':
-        return Colors.red;
-      default:
-        return Colors.grey;
-    }
-  }
-
-  /// Couleur de statut
-  Color _getStatusColor(String status) {
-    switch (status) {
-      case 'pending':
-        return Colors.amber;
-      case 'in_progress':
-        return Colors.blue;
-      case 'completed':
-        return Colors.green;
-      default:
-        return Colors.grey;
-    }
-  }
-
-  /// Widget pour une carte de mission
-  Widget _buildMissionCard(Mission mission) {
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      elevation: 2,
-      child: InkWell(
-        onTap: () => _showMissionDetails(mission),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Titre et statut
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          mission.title,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          mission.location,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _getStatusColor(mission.status).withOpacity(0.2),
-                      border: Border.all(
-                        color: _getStatusColor(mission.status),
-                      ),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      _formatStatus(mission.status),
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: _getStatusColor(mission.status),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-
-              // Description
-              Text(
-                mission.description,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey,
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              // Priorité et actions
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _getPriorityColor(mission.priority)
-                          .withOpacity(0.1),
-                      border: Border.all(
-                        color: _getPriorityColor(mission.priority),
-                      ),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      'Priorité: ${_formatPriority(mission.priority)}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: _getPriorityColor(mission.priority),
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  if (mission.status == 'pending')
-                    ElevatedButton.icon(
-                      onPressed: () => _acceptMission(mission),
-                      icon: const Icon(Icons.check, size: 16),
-                      label: const Text('Accepter'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                      ),
-                    )
-                  else if (mission.status == 'in_progress')
-                    ElevatedButton.icon(
-                      onPressed: () => _completeMission(mission),
-                      icon: const Icon(Icons.done, size: 16),
-                      label: const Text('Complété'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Afficher les détails d'une mission
-  void _showMissionDetails(Mission mission) {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Titre
-              Text(
-                mission.title,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              // Description
-              Text(
-                'Description',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                mission.description,
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey,
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Localisation
-              Text(
-                'Localisation',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 8),
-              Text(mission.location),
-              const SizedBox(height: 16),
-
-              // Priorité et Statut
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Priorité',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(_formatPriority(mission.priority)),
-                    ],
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Statut',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(_formatStatus(mission.status)),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // Notes
-              if (mission.notes != null && mission.notes!.isNotEmpty) ...[
-                Text(
-                  'Notes',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 8),
-                ...mission.notes!.map(
-                  (note) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Text('• $note'),
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
-
-              // Actions
-              if (mission.status == 'pending')
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _acceptMission(mission);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                    child: const Text('Accepter la Mission'),
-                  ),
-                )
-              else if (mission.status == 'in_progress')
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _completeMission(mission);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                    child: const Text('Marquer comme Complétée'),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Accepter une mission
-  Future<void> _acceptMission(Mission mission) async {
-    try {
-      await _missionsService.acceptMission(mission.id);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Mission acceptée!')),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur: $e')),
-      );
-    }
-  }
-
-  /// Compléter une mission
-  Future<void> _completeMission(Mission mission) async {
-    try {
-      await _missionsService.completeMission(mission.id);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Mission complétée!')),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur: $e')),
-      );
+  // Couleur de badge par filtre
+  Color _filterColor(String value) {
+    switch (value) {
+      case MissionsService.statusEnCours:   return AppColors.statusActive;
+      case MissionsService.statusTerminee:  return AppColors.statusCompleted;
+      case MissionsService.statusAnnulee:   return AppColors.statusCancelled;
+      case MissionsService.statusAssignee:  return AppColors.statusAssigned;
+      default:                              return AppColors.primary;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final currentUserId = _authService.currentUid;
+    final uid = _authService.currentUid;
 
-    if (currentUserId == null) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Missions')),
-        body: const Center(
-          child: Text('Veuillez vous connecter'),
-        ),
-      );
-    }
-
-    return DefaultTabController(
-      length: 3,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Mes Missions'),
-          elevation: 0,
-          bottom: TabBar(
-            controller: _tabController,
-            tabs: const [
-              Tab(text: 'En Attente'),
-              Tab(text: 'En Cours'),
-              Tab(text: 'Complétées'),
-            ],
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: const Text("Mes Missions"),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: IconButton(
+              icon: const Icon(Icons.filter_list_rounded),
+              tooltip: "Filtrer",
+              onPressed: () {},
+            ),
           ),
+        ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(56),
+          child: _buildFilterBar(),
         ),
-        body: TabBarView(
-          controller: _tabController,
+      ),
+      body: uid == null
+          ? _buildNotConnected()
+          : StreamBuilder<QuerySnapshot>(
+              stream: _getFilteredStream(uid),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return _buildLoading();
+                }
+                if (snapshot.hasError) {
+                  return _buildError(snapshot.error.toString());
+                }
+                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                  return _buildEmptyState();
+                }
+                return _buildList(snapshot.data!.docs, uid);
+              },
+            ),
+    );
+  }
+
+  // ── Filter bar ────────────────────────────────────────────────────────────
+  Widget _buildFilterBar() {
+    return Container(
+      height: 56,
+      color: AppColors.surface,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        itemCount: _filters.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (_, i) {
+          final f = _filters[i];
+          final isSelected = _selectedFilter == f.value;
+          final color = _filterColor(f.value);
+
+          return GestureDetector(
+            onTap: () => setState(() => _selectedFilter = f.value),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeInOut,
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 0),
+              decoration: BoxDecoration(
+                color: isSelected ? color : AppColors.surfaceVariant,
+                borderRadius: AppSpacing.roundedFull,
+                border: Border.all(
+                  color: isSelected ? color : Colors.transparent,
+                ),
+              ),
+              child: Center(
+                child: Text(
+                  f.label,
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    color: isSelected ? Colors.white : AppColors.textSecondary,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // ── Mission list ──────────────────────────────────────────────────────────
+  Widget _buildList(List<QueryDocumentSnapshot> docs, String uid) {
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
+      itemCount: docs.length,
+      itemBuilder: (context, index) {
+        final doc = docs[index];
+        final data = {
+          'id': doc.id,
+          ...(doc.data() as Map<String, dynamic>),
+        };
+        final status = MissionsService.normalizeStatus(data['status'] as String?);
+        return MissionCardPro(
+          mission: data,
+          isBusy: _busyMissionId == doc.id,
+          onStart: status == MissionsService.statusAssignee ||
+                  status == MissionsService.statusEnAttente
+              ? () => _confirmAction(
+                    missionId: doc.id,
+                    actionType: _ActionType.start,
+                    action: () => _missionsService.acceptMission(doc.id, uid),
+                  )
+              : null,
+          onComplete: status == MissionsService.statusEnCours
+              ? () => _confirmAction(
+                    missionId: doc.id,
+                    actionType: _ActionType.complete,
+                    action: () => _missionsService.completeMission(doc.id, uid),
+                  )
+              : null,
+          onCancel: status == MissionsService.statusEnCours
+              ? () => _confirmAction(
+                    missionId: doc.id,
+                    actionType: _ActionType.cancel,
+                    action: () => _missionsService.cancelMission(doc.id, uid),
+                  )
+              : null,
+        );
+      },
+    );
+  }
+
+  // ── States ────────────────────────────────────────────────────────────────
+  Widget _buildLoading() {
+    return const Center(
+      child: CircularProgressIndicator(
+        color: AppColors.primary,
+        strokeWidth: 2.5,
+      ),
+    );
+  }
+
+  Widget _buildNotConnected() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.account_circle_outlined,
+              size: 64, color: AppColors.textSecondary),
+          AppSpacing.gapLg,
+          Text("Utilisateur non connecté", style: AppTextStyles.h4),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildError(String msg) {
+    return Center(
+      child: Padding(
+        padding: AppSpacing.pagePadding,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // En attente
-            StreamBuilder<List<Mission>>(
-              stream: _missionsService.listenToAllMyMissions(currentUserId),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                if (snapshot.hasError) {
-                  return Center(child: Text('Erreur: ${snapshot.error}'));
-                }
-
-                final missions = snapshot.data ?? [];
-                final pendingMissions =
-                    missions.where((m) => m.status == 'pending').toList();
-
-                if (pendingMissions.isEmpty) {
-                  return const Center(
-                    child: Text('Aucune mission en attente'),
-                  );
-                }
-
-                return ListView(
-                  children: pendingMissions
-                      .map((mission) => _buildMissionCard(mission))
-                      .toList(),
-                );
-              },
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.errorLight,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.wifi_off_rounded,
+                  color: AppColors.error, size: 36),
             ),
-
-            // En cours
-            StreamBuilder<List<Mission>>(
-              stream: _missionsService.listenToAllMyMissions(currentUserId),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                if (snapshot.hasError) {
-                  return Center(child: Text('Erreur: ${snapshot.error}'));
-                }
-
-                final missions = snapshot.data ?? [];
-                final inProgressMissions =
-                    missions.where((m) => m.status == 'in_progress').toList();
-
-                if (inProgressMissions.isEmpty) {
-                  return const Center(
-                    child: Text('Aucune mission en cours'),
-                  );
-                }
-
-                return ListView(
-                  children: inProgressMissions
-                      .map((mission) => _buildMissionCard(mission))
-                      .toList(),
-                );
-              },
-            ),
-
-            // Complétées
-            StreamBuilder<List<Mission>>(
-              stream: _missionsService.listenToAllMyMissions(currentUserId),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                if (snapshot.hasError) {
-                  return Center(child: Text('Erreur: ${snapshot.error}'));
-                }
-
-                final missions = snapshot.data ?? [];
-                final completedMissions =
-                    missions.where((m) => m.status == 'completed').toList();
-
-                if (completedMissions.isEmpty) {
-                  return const Center(
-                    child: Text('Aucune mission complétée'),
-                  );
-                }
-
-                return ListView(
-                  children: completedMissions
-                      .map((mission) => _buildMissionCard(mission))
-                      .toList(),
-                );
-              },
+            AppSpacing.gapLg,
+            Text("Erreur de chargement", style: AppTextStyles.h4),
+            AppSpacing.gapSm,
+            Text(
+              msg,
+              style: AppTextStyles.bodySm,
+              textAlign: TextAlign.center,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildEmptyState() {
+    final isFiltered = _selectedFilter != 'all';
+    return Center(
+      child: Padding(
+        padding: AppSpacing.pagePadding,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 88,
+              height: 88,
+              decoration: BoxDecoration(
+                color: AppColors.surfaceVariant,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                isFiltered
+                    ? Icons.filter_alt_off_rounded
+                    : Icons.assignment_outlined,
+                size: 40,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            AppSpacing.gapXl,
+            Text(
+              isFiltered ? "Aucun résultat" : "Aucune mission",
+              style: AppTextStyles.h3,
+            ),
+            AppSpacing.gapSm,
+            Text(
+              isFiltered
+                  ? "Aucune mission ne correspond au filtre sélectionné."
+                  : "Vos missions assignées apparaîtront ici.",
+              style: AppTextStyles.bodySm,
+              textAlign: TextAlign.center,
+            ),
+            if (isFiltered) ...[
+              AppSpacing.gapXl2,
+              GestureDetector(
+                onTap: () => setState(() => _selectedFilter = 'all'),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 20, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryLight,
+                    borderRadius: AppSpacing.roundedFull,
+                  ),
+                  child: Text(
+                    "Voir toutes les missions",
+                    style: AppTextStyles.label
+                        .copyWith(color: AppColors.primary),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Firestore query ───────────────────────────────────────────────────────
+  Stream<QuerySnapshot> _getFilteredStream(String uid) {
+    Query q = FirebaseFirestore.instance
+        .collection('missions')
+        .where('assignedTo', isEqualTo: uid);
+
+    if (_selectedFilter != 'all') {
+      q = q.where('status', isEqualTo: _selectedFilter);
+    }
+
+    return q.orderBy('createdAt', descending: true).snapshots();
+  }
+
+  // ── Action confirmation dialog ────────────────────────────────────────────
+  Future<void> _confirmAction({
+    required String missionId,
+    required _ActionType actionType,
+    required Future<void> Function() action,
+  }) async {
+    final cfg = _actionConfig(actionType);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: AppSpacing.roundedXl),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: cfg.color.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(cfg.icon, color: cfg.color, size: 32),
+              ),
+              AppSpacing.gapLg,
+              Text(cfg.title, style: AppTextStyles.h4),
+              AppSpacing.gapSm,
+              Text(
+                cfg.message,
+                style: AppTextStyles.bodySm,
+                textAlign: TextAlign.center,
+              ),
+              AppSpacing.gapXl2,
+              Row(
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: 46,
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.textSecondary,
+                          side: const BorderSide(color: AppColors.border),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: AppSpacing.roundedMd),
+                        ),
+                        child: Text("Annuler",
+                            maxLines: 1,
+                            style: AppTextStyles.btn.copyWith(
+                                color: AppColors.textSecondary, letterSpacing: 0)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: SizedBox(
+                      height: 46,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: cfg.color,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: AppSpacing.roundedMd),
+                        ),
+                        child: Text("Confirmer",
+                            maxLines: 1,
+                            style: AppTextStyles.btn.copyWith(
+                                color: Colors.white, letterSpacing: 0)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _busyMissionId = missionId);
+    try {
+      await action();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(cfg.successMessage),
+          backgroundColor: cfg.color,
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur : $error'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _busyMissionId = null);
+    }
+  }
+}
+
+// ── Action type helpers ───────────────────────────────────────────────────────
+enum _ActionType { start, complete, cancel }
+
+({String title, String message, String successMessage, IconData icon, Color color})
+    _actionConfig(_ActionType type) {
+  switch (type) {
+    case _ActionType.start:
+      return (
+        title: 'Démarrer la mission ?',
+        message: 'Le statut passera en cours et la mission sera visible en live.',
+        successMessage: 'Mission démarrée.',
+        icon: Icons.play_arrow_rounded,
+        color: AppColors.primary,
+      );
+    case _ActionType.complete:
+      return (
+        title: 'Terminer la mission ?',
+        message: 'La mission sera marquée comme terminée.',
+        successMessage: 'Mission terminée.',
+        icon: Icons.check_circle_outline_rounded,
+        color: AppColors.success,
+      );
+    case _ActionType.cancel:
+      return (
+        title: 'Arrêter la mission ?',
+        message: 'La mission sera annulée et retirée du suivi live.',
+        successMessage: 'Mission arrêtée.',
+        icon: Icons.stop_circle_outlined,
+        color: AppColors.error,
+      );
   }
 }

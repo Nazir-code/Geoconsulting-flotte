@@ -4,6 +4,7 @@ import { Fuel, TrendingUp, AlertTriangle, Plus, Droplets } from 'lucide-react';
 import { dataService } from '@/services/dataService';
 import type { FuelRecord } from '@/types';
 import { formatFCFA, formatNumber, formatDate } from '@/lib/utils';
+import { EmptyState, SkeletonKPICard, Skeleton } from '@/components/common';
 import { mockChartData } from '@/data/mockData';
 import {
   BarChart,
@@ -38,8 +39,14 @@ export function FuelView() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="loading-spinner" />
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <SkeletonKPICard key={i} />
+          ))}
+        </div>
+        <Skeleton variant="rect" className="h-72 w-full" />
+        <Skeleton variant="rect" className="h-64 w-full" />
       </div>
     );
   }
@@ -203,39 +210,40 @@ export function FuelView() {
         <h3 className="text-lg font-display font-semibold text-text-primary mb-4">
           Derniers Pleins
         </h3>
-        <div className="overflow-x-auto">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Véhicule</th>
-                <th>Chauffeur</th>
-                <th>Quantité</th>
-                <th>Coût Total</th>
-                <th>Station</th>
-              </tr>
-            </thead>
-            <tbody>
-              {fuelRecords.map((record) => (
-                <tr key={record.id}>
-                  <td>{formatDate(record.date)}</td>
-                  <td className="font-mono">{record.vehicle.plateNumber}</td>
-                  <td>{record.driver.user.firstName} {record.driver.user.lastName.charAt(0)}.</td>
-                  <td>{formatNumber(record.quantity)} L</td>
-                  <td className="text-accent-cyan">{formatFCFA(record.totalCost)}</td>
-                  <td>{record.station || 'N/A'}</td>
-                </tr>
-              ))}
-              {fuelRecords.length === 0 && (
+        {fuelRecords.length === 0 ? (
+          <EmptyState
+            icon={Droplets}
+            title="Aucun plein enregistré"
+            description="Ajoutez un plein pour suivre la consommation et les coûts."
+          />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="data-table">
+              <thead>
                 <tr>
-                  <td colSpan={6} className="text-center py-8 text-text-secondary">
-                    Aucun enregistrement trouvé
-                  </td>
+                  <th>Date</th>
+                  <th>Véhicule</th>
+                  <th>Chauffeur</th>
+                  <th>Quantité</th>
+                  <th>Coût Total</th>
+                  <th>Station</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {fuelRecords.map((record) => (
+                  <tr key={record.id}>
+                    <td>{formatDate(record.date)}</td>
+                    <td className="font-mono">{record.vehicle.plateNumber}</td>
+                    <td>{record.driver.user.firstName} {record.driver.user.lastName.charAt(0)}.</td>
+                    <td>{formatNumber(record.quantity)} L</td>
+                    <td className="text-accent-cyan">{formatFCFA(record.totalCost)}</td>
+                    <td>{record.station || 'N/A'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </motion.div>
     </motion.div>
   );

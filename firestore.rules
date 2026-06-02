@@ -1,0 +1,63 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --- Helper Functions ---
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    function isManager() {
+      return get(/databases/$(database)/documents/drivers/$(request.auth.uid)).data.role in ['manager', 'admin']
+          || request.auth.token.email.matches('.*admin.*')
+          || request.auth.token.email.matches('.*manager.*');
+    }
+
+    // --- Collections ---
+
+    // Collection: Drivers
+    match /drivers/{driverId} {
+      allow read: if isAuthenticated();
+
+      // Un chauffeur peut mettre à jour ses données GPS et son statut
+      allow update: if isAuthenticated() && (isOwner(driverId) || isManager());
+
+      // Seuls les managers peuvent créer ou supprimer des profils (via l'app web)
+      allow create, delete: if isAuthenticated() && isManager();
+
+      // Sous-collection : historique GPS — écrit uniquement par le chauffeur propriétaire
+      match /location_history/{historyId} {
+        allow read: if isAuthenticated() && (isOwner(driverId) || isManager());
+        allow create: if isAuthenticated() && isOwner(driverId);
+      }
+    }
+
+    // Collection: Missions
+    match /missions/{missionId} {
+      // Lecture autorisée pour le chauffeur assigné ou les managers
+      allow read: if isAuthenticated() && (resource.data.assignedTo == request.auth.uid || isManager());
+
+      // Un chauffeur peut mettre à jour le statut d'une mission qui lui est assignée
+      allow update: if isAuthenticated() && (resource.data.assignedTo == request.auth.uid || isManager());
+
+      // Seuls les managers peuvent créer ou supprimer des missions
+      allow create, delete: if isAuthenticated() && isManager();
+    }
+
+    // Collection: fuel_records (optionnel, si implémenté)
+    match /fuel_records/{recordId} {
+      allow read, write: if isAuthenticated() && (resource.data.driverId == request.auth.uid || isManager());
+    }
+
+    // Sécurité par défaut : Refuser tout le reste
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

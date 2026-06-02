@@ -26,6 +26,7 @@ async function fixNotificationService() {
         const driver = driverSnapshot.docs[0].data();
         const fcmToken = driver.fcmToken;
         
+        
         if (!fcmToken) {
           console.log(`❌ Pas de token FCM pour driver: ${driverSnapshot.docs[0].id}`);
           return false;

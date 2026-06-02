@@ -1,7 +1,8 @@
 import { motion } from 'framer-motion';
 import { Car, Gauge, Calendar, User, Edit, Trash2 } from 'lucide-react';
 import type { Vehicle } from '@/types';
-import { formatNumber, getStatusColor, getStatusLabel } from '@/lib/utils';
+import { formatNumber } from '@/lib/utils';
+import { StatusChip } from '@/components/common';
 
 interface VehicleCardProps {
   vehicle: Vehicle;
@@ -11,8 +12,6 @@ interface VehicleCardProps {
 }
 
 export function VehicleCard({ vehicle, index, onEdit, onDelete }: VehicleCardProps) {
-  const statusColor = getStatusColor(vehicle.status);
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -37,9 +36,7 @@ export function VehicleCard({ vehicle, index, onEdit, onDelete }: VehicleCardPro
         
         {/* Status Badge */}
         <div className="absolute top-3 left-3">
-          <span className={`px-2 py-1 rounded-lg text-xs font-medium bg-${statusColor}-500/20 text-${statusColor}-400 border border-${statusColor}-500/30 backdrop-blur-sm`}>
-            {getStatusLabel(vehicle.status)}
-          </span>
+          <StatusChip status={vehicle.status} size="sm" />
         </div>
 
         {/* Plate Number */}

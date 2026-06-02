@@ -4,10 +4,12 @@ import { Car, Users, Plus, Search, Filter, Radio } from 'lucide-react';
 import { VehicleCard } from './VehicleCard';
 import { DriverCard } from './DriverCard';
 import { CreateVehicleForm } from './CreateVehicleForm';
+import { AddDriverModal } from './AddDriverModal';
 import { dataService } from '@/services/dataService';
 import { FirestoreDriverService } from '@/services/firestoreDriverService';
 import type { Vehicle, Driver, User } from '@/types';
 import { cn } from '@/lib/utils';
+import { EmptyState, Skeleton, SkeletonList } from '@/components/common';
 
 type TabType = 'vehicles' | 'drivers';
 
@@ -18,6 +20,7 @@ export function FleetView() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [showVehicleForm, setShowVehicleForm] = useState(false);
+  const [showDriverForm, setShowDriverForm] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
 
   useEffect(() => {
@@ -111,6 +114,18 @@ export function FleetView() {
     setShowVehicleForm(true);
   };
 
+  const handleDeleteDriver = async (uid: string) => {
+    const ok = window.confirm('Confirmer la suppression du chauffeur ? Cette action est irréversible.');
+    if (!ok) return;
+
+    try {
+      await FirestoreDriverService.deleteDriver(uid);
+    } catch (error) {
+      console.error('Erreur suppression chauffeur:', error);
+      alert('Impossible de supprimer le chauffeur. Voir la console pour détails.');
+    }
+  };
+
   const handleCloseForm = () => {
     setShowVehicleForm(false);
     setEditingVehicle(null);
@@ -162,6 +177,19 @@ export function FleetView() {
             >
               <Plus className="w-4 h-4" />
               <span>Ajouter Véhicule</span>
+            </motion.button>
+          )}
+
+          {/* Add Driver Button */}
+          {activeTab === 'drivers' && (
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setShowDriverForm(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-accent-cyan/10 border border-accent-cyan/50 rounded-lg text-accent-cyan hover:bg-accent-cyan/20 hover:shadow-glow-cyan transition-all font-medium text-sm"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Ajouter Chauffeur</span>
             </motion.button>
           )}
 
@@ -244,19 +272,41 @@ export function FleetView() {
       {/* Content */}
       {activeTab === 'vehicles' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filteredVehicles.map((vehicle, index) => (
-            <VehicleCard
-              key={vehicle.id}
-              vehicle={vehicle}
-              index={index}
-              onEdit={handleEditVehicle}
-              onDelete={handleDeleteVehicle}
-            />
-          ))}
-          {filteredVehicles.length === 0 && (
-            <div className="col-span-full py-12 text-center">
-              <Car className="w-12 h-12 text-text-secondary/30 mx-auto mb-4" />
-              <p className="text-text-secondary">Aucun véhicule trouvé</p>
+          {isLoading && vehicles.length === 0 ? (
+            Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="glass-card overflow-hidden">
+                <Skeleton variant="rect" className="h-40 rounded-none" />
+                <div className="p-4 space-y-3">
+                  <Skeleton variant="text" className="w-2/3 h-4" />
+                  <Skeleton variant="text" className="w-1/3" />
+                  <div className="grid grid-cols-2 gap-3 pt-1">
+                    <Skeleton variant="rect" className="h-8" />
+                    <Skeleton variant="rect" className="h-8" />
+                  </div>
+                </div>
+              </div>
+            ))
+          ) : filteredVehicles.length > 0 ? (
+            filteredVehicles.map((vehicle, index) => (
+              <VehicleCard
+                key={vehicle.id}
+                vehicle={vehicle}
+                index={index}
+                onEdit={handleEditVehicle}
+                onDelete={handleDeleteVehicle}
+              />
+            ))
+          ) : (
+            <div className="col-span-full">
+              <EmptyState
+                icon={Car}
+                title={searchQuery ? 'Aucun véhicule correspondant' : 'Aucun véhicule'}
+                description={
+                  searchQuery
+                    ? 'Essayez un autre terme de recherche.'
+                    : 'Ajoutez un véhicule pour constituer votre flotte.'
+                }
+              />
             </div>
           )}
         </div>
@@ -267,14 +317,22 @@ export function FleetView() {
             Les chauffeurs s'inscrivent via l'application mobile et apparaissent ici automatiquement.
           </div>
 
-          {filteredDrivers.map((driver, index) => (
-            <DriverCard key={driver.id} driver={driver} index={index} />
-          ))}
-          {filteredDrivers.length === 0 && (
-            <div className="py-12 text-center">
-              <Users className="w-12 h-12 text-text-secondary/30 mx-auto mb-4" />
-              <p className="text-text-secondary">Aucun chauffeur trouvé sur Firestore</p>
-            </div>
+          {isLoading && drivers.length === 0 ? (
+            <SkeletonList count={4} />
+          ) : filteredDrivers.length > 0 ? (
+            filteredDrivers.map((driver, index) => (
+              <DriverCard key={driver.id} driver={driver} index={index} onDelete={handleDeleteDriver} />
+            ))
+          ) : (
+            <EmptyState
+              icon={Users}
+              title={searchQuery ? 'Aucun chauffeur correspondant' : 'Aucun chauffeur'}
+              description={
+                searchQuery
+                  ? 'Essayez un autre terme de recherche.'
+                  : "Les chauffeurs apparaissent ici dès qu'ils s'inscrivent via l'application mobile."
+              }
+            />
           )}
         </div>
       )}
@@ -308,6 +366,16 @@ export function FleetView() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Add Driver Modal */}
+      <AddDriverModal
+        isOpen={showDriverForm}
+        onClose={() => setShowDriverForm(false)}
+        onSuccess={() => {
+          // Le listener Firestore mettra à jour les drivers automatiquement
+          setShowDriverForm(false);
+        }}
+      />
     </motion.div>
   );
 }

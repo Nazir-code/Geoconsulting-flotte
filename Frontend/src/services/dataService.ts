@@ -201,7 +201,7 @@ class DataService {
 
   async getActiveMissions(): Promise<Mission[]> {
     await delay(10);
-    return this.missions.filter(m => m.status === 'in_progress');
+    return this.missions.filter(m => m.status === 'en_cours');
   }
 
   async createMission(data: CreateMissionFormData): Promise<Mission> {
@@ -223,7 +223,7 @@ class DataService {
       destination: data.destination,
       purpose: data.purpose,
       startTime: data.startTime || new Date().toISOString(),
-      status: 'in_progress',
+      status: 'en_cours',
       startLocation: 'Niamey',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -263,7 +263,7 @@ class DataService {
       throw new Error('Mission non trouvée');
     }
 
-    mission.status = 'completed';
+    mission.status = 'terminée';
     mission.endTime = new Date().toISOString();
     mission.endLocation = mission.destination;
     if (data) {
@@ -316,7 +316,7 @@ class DataService {
       throw new Error('Mission non trouvée');
     }
 
-    mission.status = 'cancelled';
+    mission.status = 'annulée';
     mission.updatedAt = new Date().toISOString();
 
     // Update driver and vehicle status
@@ -495,7 +495,7 @@ class DataService {
       
       if (random < 0.3) {
         // Simulate mission progress update
-        const activeMissions = this.missions.filter(m => m.status === 'in_progress');
+        const activeMissions = this.missions.filter(m => m.status === 'en_cours');
         if (activeMissions.length > 0) {
           const mission = activeMissions[Math.floor(Math.random() * activeMissions.length)];
           this.emit('mission_progress', {

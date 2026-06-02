@@ -59,7 +59,7 @@ export interface Driver {
 }
 
 // Mission Types
-export type MissionStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
+export type MissionStatus = 'en_attente' | 'assignée' | 'en_cours' | 'terminée' | 'annulée';
 
 export interface Mission {
   id: string;

@@ -4,6 +4,7 @@ import { Download, FileText, TrendingUp, Users, Car } from 'lucide-react';
 import { dataService } from '@/services/dataService';
 import type { Mission, Vehicle, Driver } from '@/types';
 import { formatFCFA, formatNumber } from '@/lib/utils';
+import { EmptyState, SkeletonKPICard, Skeleton } from '@/components/common';
 import { mockChartData } from '@/data/mockData';
 import {
   PieChart,
@@ -45,13 +46,13 @@ export function ReportsView() {
 
   // Calculate statistics
   const totalMissions = missions.length;
-  const completedMissions = missions.filter(m => m.status === 'completed').length;
+  const completedMissions = missions.filter(m => m.status === 'terminée').length;
   const totalDistance = missions.reduce((sum, m) => sum + (m.distance || 0), 0);
   const totalFuelConsumed = missions.reduce((sum, m) => sum + (m.fuelConsumed || 0), 0);
 
   // Vehicle utilization data
   const vehicleUtilization = vehicles.map(v => {
-    const vehicleMissions = missions.filter(m => m.vehicleId === v.id && m.status === 'completed');
+    const vehicleMissions = missions.filter(m => m.vehicleId === v.id && m.status === 'terminée');
     return {
       name: v.plateNumber,
       value: vehicleMissions.length,
@@ -60,7 +61,7 @@ export function ReportsView() {
 
   // Driver performance data
   const driverPerformance = drivers.map(d => {
-    const driverMissions = missions.filter(m => m.driverId === d.id && m.status === 'completed');
+    const driverMissions = missions.filter(m => m.driverId === d.id && m.status === 'terminée');
     return {
       name: `${d.user.firstName} ${d.user.lastName.charAt(0)}.`,
       missions: driverMissions.length,
@@ -68,10 +69,20 @@ export function ReportsView() {
     };
   }).sort((a, b) => b.missions - a.missions).slice(0, 5);
 
+  const maxDriverMissions = Math.max(1, ...driverPerformance.map((d) => d.missions));
+
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="loading-spinner" />
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <SkeletonKPICard key={i} />
+          ))}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Skeleton variant="rect" className="h-72 w-full" />
+          <Skeleton variant="rect" className="h-72 w-full" />
+        </div>
       </div>
     );
   }
@@ -185,6 +196,13 @@ export function ReportsView() {
           <h3 className="text-lg font-display font-semibold text-text-primary mb-4">
             Utilisation des Véhicules
           </h3>
+          {vehicleUtilization.length === 0 ? (
+            <EmptyState
+              icon={Car}
+              title="Pas encore de données"
+              description="L'utilisation des véhicules s'affichera une fois des missions terminées."
+            />
+          ) : (
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -212,6 +230,7 @@ export function ReportsView() {
               </PieChart>
             </ResponsiveContainer>
           </div>
+          )}
         </motion.div>
 
         {/* Driver Performance */}
@@ -224,33 +243,41 @@ export function ReportsView() {
           <h3 className="text-lg font-display font-semibold text-text-primary mb-4">
             Performance des Chauffeurs
           </h3>
-          <div className="space-y-3">
-            {driverPerformance.map((driver, index) => (
-              <div key={driver.name} className="flex items-center gap-4">
-                <div className="w-8 h-8 rounded-lg bg-accent-cyan/10 flex items-center justify-center text-accent-cyan font-medium text-sm">
-                  {index + 1}
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm text-text-primary">{driver.name}</span>
-                    <span className="text-xs text-text-secondary">{driver.missions} missions</span>
+          {driverPerformance.length === 0 ? (
+            <EmptyState
+              icon={Users}
+              title="Pas encore de classement"
+              description="Le top chauffeurs apparaîtra dès que des missions seront terminées."
+            />
+          ) : (
+            <div className="space-y-3">
+              {driverPerformance.map((driver, index) => (
+                <div key={driver.name} className="flex items-center gap-4">
+                  <div className="w-8 h-8 rounded-lg bg-accent-cyan/10 flex items-center justify-center text-accent-cyan font-medium text-sm">
+                    {index + 1}
                   </div>
-                  <div className="h-2 bg-background-secondary rounded-full overflow-hidden">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${(driver.missions / Math.max(...driverPerformance.map(d => d.missions))) * 100}%` }}
-                      transition={{ delay: 0.8 + index * 0.1, duration: 0.5 }}
-                      className="h-full bg-gradient-to-r from-accent-cyan to-accent-violet rounded-full"
-                    />
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm text-text-primary">{driver.name}</span>
+                      <span className="text-xs text-text-secondary">{driver.missions} missions</span>
+                    </div>
+                    <div className="h-2 bg-background-secondary rounded-full overflow-hidden">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${(driver.missions / maxDriverMissions) * 100}%` }}
+                        transition={{ delay: 0.8 + index * 0.1, duration: 0.5 }}
+                        className="h-full bg-gradient-to-r from-accent-cyan to-accent-violet rounded-full"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs text-accent-lime">★</span>
+                    <span className="text-sm text-text-primary">{driver.rating.toFixed(1)}</span>
                   </div>
                 </div>
-                <div className="flex items-center gap-1">
-                  <span className="text-xs text-accent-lime">★</span>
-                  <span className="text-sm text-text-primary">{driver.rating.toFixed(1)}</span>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </motion.div>
       </div>
 

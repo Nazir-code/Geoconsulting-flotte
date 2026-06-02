@@ -42,10 +42,16 @@ function initializeFirebaseAdmin() {
     } 
     // Method 3: Using default application credentials (Google Cloud)
     else {
-      console.log('🔥 Initializing Firebase Admin with default credentials');
-      admin.initializeApp({
-        projectId,
-      });
+      try {
+        console.log('🔥 Initializing Firebase Admin with default credentials');
+        admin.initializeApp({
+          projectId,
+        });
+      } catch (e) {
+        console.warn('⚠️ Warning: Firebase Admin could not initialize with default credentials.');
+        console.log('💡 Tip: Place serviceAccountKey.json in the backend folder to enable full sync.');
+        // Don't throw, let the store handle the missing DB gracefully
+      }
     }
 
     if (!process.env.FIREBASE_PROJECT_ID && !process.env.GCLOUD_PROJECT) {

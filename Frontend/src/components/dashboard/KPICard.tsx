@@ -13,30 +13,34 @@ interface KPICardProps {
   delay?: number;
 }
 
+/**
+ * Map de couleurs — classes STATIQUES uniquement (compilées par le JIT Tailwind).
+ * `gradient` pointe vers un token CSS (var) appliqué en inline style.
+ */
 const colorMap = {
   cyan: {
     bg: 'bg-accent-cyan/10',
-    border: 'border-accent-cyan/30',
     text: 'text-accent-cyan',
-    glow: 'shadow-glow-cyan',
+    bar: 'bg-accent-cyan/50',
+    gradient: 'var(--gradient-cyan)',
   },
   violet: {
     bg: 'bg-accent-violet/10',
-    border: 'border-accent-violet/30',
     text: 'text-accent-violet',
-    glow: 'shadow-[0_0_18px_rgba(184,41,247,0.22)]',
+    bar: 'bg-accent-violet/50',
+    gradient: 'var(--gradient-violet)',
   },
   lime: {
     bg: 'bg-accent-lime/10',
-    border: 'border-accent-lime/30',
     text: 'text-accent-lime',
-    glow: 'shadow-[0_0_18px_rgba(209,243,102,0.22)]',
+    bar: 'bg-accent-lime/50',
+    gradient: 'var(--gradient-lime)',
   },
   orange: {
     bg: 'bg-accent-orange/10',
-    border: 'border-accent-orange/30',
     text: 'text-accent-orange',
-    glow: 'shadow-[0_0_18px_rgba(255,106,61,0.22)]',
+    bar: 'bg-accent-orange/50',
+    gradient: 'var(--gradient-orange)',
   },
 };
 
@@ -51,8 +55,8 @@ export function KPICard({
   delay = 0,
 }: KPICardProps) {
   const colors = colorMap[color];
-  const isPositive = change && change > 0;
-  const isNegative = change && change < 0;
+  const isPositive = change !== undefined && change > 0;
+  const isNegative = change !== undefined && change < 0;
 
   const formatValue = (val: number) => {
     if (suffix === 'FCFA') return formatFCFA(val);
@@ -65,47 +69,56 @@ export function KPICard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay, duration: 0.5 }}
       whileHover={{ y: -4, transition: { duration: 0.2 } }}
-      className={`glass-card p-5 ${colors.border} hover:${colors.glow} transition-all duration-300`}
+      className="kpi-card relative"
     >
-      <div className="flex items-start justify-between mb-4">
-        <div className={`w-10 h-10 rounded-xl ${colors.bg} flex items-center justify-center`}>
-          <Icon className={`w-5 h-5 ${colors.text}`} strokeWidth={1.5} />
-        </div>
-        {change !== undefined && (
-          <div className={`flex items-center gap-1 text-xs ${
-            isPositive ? 'text-emerald-400' : isNegative ? 'text-red-400' : 'text-text-secondary'
-          }`}>
-            {isPositive ? (
-              <TrendingUp className="w-3 h-3" />
-            ) : isNegative ? (
-              <TrendingDown className="w-3 h-3" />
-            ) : null}
-            <span>{change > 0 ? '+' : ''}{change}%</span>
-          </div>
-        )}
-      </div>
+      {/* Accent gradient léger (coin supérieur) */}
+      <div
+        className="pointer-events-none absolute inset-0 opacity-80"
+        style={{ backgroundImage: colors.gradient }}
+        aria-hidden
+      />
 
-      <div>
+      <div className="relative">
+        <div className="flex items-start justify-between mb-4">
+          <div className={`w-10 h-10 rounded-xl ${colors.bg} flex items-center justify-center`}>
+            <Icon className={`w-5 h-5 ${colors.text}`} strokeWidth={1.5} />
+          </div>
+          {change !== undefined && (
+            <div
+              className={`flex items-center gap-1 text-xs font-medium ${
+                isPositive ? 'text-emerald-400' : isNegative ? 'text-red-400' : 'text-text-secondary'
+              }`}
+            >
+              {isPositive ? (
+                <TrendingUp className="w-3 h-3" />
+              ) : isNegative ? (
+                <TrendingDown className="w-3 h-3" />
+              ) : null}
+              <span>{change > 0 ? '+' : ''}{change}%</span>
+            </div>
+          )}
+        </div>
+
         <p className="text-text-secondary text-sm mb-1">{title}</p>
-        <h3 className={`text-2xl font-display font-bold ${colors.text}`}>
+        <h3 className="text-2xl font-display font-bold text-text-primary truncate-text">
           {formatValue(value)}
         </h3>
         {changeLabel && (
           <p className="text-text-secondary/60 text-xs mt-1">{changeLabel}</p>
         )}
-      </div>
 
-      {/* Sparkline placeholder */}
-      <div className="mt-4 h-8 flex items-end gap-0.5">
-        {[40, 65, 45, 80, 55, 70, 60, 85, 75, 90].map((h, i) => (
-          <motion.div
-            key={i}
-            initial={{ height: 0 }}
-            animate={{ height: `${h}%` }}
-            transition={{ delay: delay + 0.1 + i * 0.03, duration: 0.3 }}
-            className={`flex-1 rounded-t-sm ${colors.bg} opacity-60`}
-          />
-        ))}
+        {/* Sparkline décoratif (subtil) */}
+        <div className="mt-4 h-8 flex items-end gap-0.5">
+          {[40, 65, 45, 80, 55, 70, 60, 85, 75, 90].map((h, i) => (
+            <motion.div
+              key={i}
+              initial={{ height: 0 }}
+              animate={{ height: `${h}%` }}
+              transition={{ delay: delay + 0.1 + i * 0.03, duration: 0.3 }}
+              className={`flex-1 rounded-t-sm ${colors.bar}`}
+            />
+          ))}
+        </div>
       </div>
     </motion.div>
   );

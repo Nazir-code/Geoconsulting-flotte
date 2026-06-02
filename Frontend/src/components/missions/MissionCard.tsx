@@ -1,7 +1,8 @@
 import { motion } from 'framer-motion';
 import { MapPin, ArrowRight, CheckCircle, XCircle, User, Car } from 'lucide-react';
 import type { Mission } from '@/types';
-import { formatDateTime, getStatusColor, getStatusLabel } from '@/lib/utils';
+import { formatDateTime } from '@/lib/utils';
+import { StatusChip } from '@/components/common';
 
 interface MissionCardProps {
   mission: Mission;
@@ -11,8 +12,7 @@ interface MissionCardProps {
 }
 
 export function MissionCard({ mission, index, onComplete, onCancel }: MissionCardProps) {
-  const statusColor = getStatusColor(mission.status);
-  const isActive = mission.status === 'in_progress' || mission.status === 'pending';
+  const isActive = mission.status === 'en_cours' || mission.status === 'assignée';
 
   return (
     <motion.div
@@ -25,9 +25,7 @@ export function MissionCard({ mission, index, onComplete, onCancel }: MissionCar
         {/* Route Info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3 mb-2">
-            <span className={`status-badge bg-${statusColor}-500/20 text-${statusColor}-400 border-${statusColor}-500/30`}>
-              {getStatusLabel(mission.status)}
-            </span>
+            <StatusChip status={mission.status} />
             <span className="text-xs text-text-secondary/60 truncate-text">
               {formatDateTime(mission.startTime)}
             </span>
@@ -94,7 +92,7 @@ export function MissionCard({ mission, index, onComplete, onCancel }: MissionCar
         {/* Actions */}
         {isActive && (
           <div className="flex items-center gap-2 flex-wrap">
-            {mission.status === 'in_progress' && (
+            {mission.status === 'en_cours' && (
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -118,7 +116,7 @@ export function MissionCard({ mission, index, onComplete, onCancel }: MissionCar
         )}
 
         {/* Completed Info */}
-        {mission.status === 'completed' && mission.endTime && (
+        {mission.status === 'terminée' && mission.endTime && (
           <div className="flex items-center gap-4 text-sm text-text-secondary">
             {mission.distance && (
               <div>
