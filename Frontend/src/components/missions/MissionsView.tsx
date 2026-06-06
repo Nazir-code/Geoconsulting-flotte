@@ -8,6 +8,7 @@ import { LiveTrackingView } from './LiveTrackingView';
 import { dataService } from '@/services/dataService';
 import { FirestoreMissionService, normalizeMissionStatus, type Mission as FirestoreMission } from '@/services/firestoreMissionService';
 import { FirestoreDriverService, type Driver as FirestoreDriver } from '@/services/firestoreDriverService';
+import { FirestoreVehicleService } from '@/services/firestoreVehicleService';
 import type { Mission, MissionStatus, Driver, Vehicle } from '@/types';
 import { cn } from '@/lib/utils';
 import { EmptyState, SkeletonList, useToast } from '@/components/common';
@@ -123,9 +124,9 @@ export function MissionsView() {
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<ActiveTab>('missions');
   const [allDrivers, setAllDrivers] = useState<Driver[]>([]);
-  const [allVehicles, setAllVehicles] = useState<Vehicle[]>([]);
-  // Vrais chauffeurs Firestore (uid = assignedTo) pour résoudre les noms.
+  // Vrais chauffeurs / véhicules Firestore pour résoudre noms et plaques.
   const [firestoreDrivers, setFirestoreDrivers] = useState<FirestoreDriver[]>([]);
+  const [firestoreVehicles, setFirestoreVehicles] = useState<Vehicle[]>([]);
 
   // Suivi des statuts précédents pour logger les transitions temps réel
   const prevStatusesRef = useRef<Record<string, string>>({});
@@ -133,12 +134,9 @@ export function MissionsView() {
   // Charger les données de référence (drivers/vehicles) pour le mapping
   const loadReferenceData = useCallback(async () => {
     try {
-      const [drivers, vehicles] = await Promise.all([
-        dataService.getDrivers(),
-        dataService.getVehicles(),
-      ]);
+      // Fallback chauffeurs (mock) ; les vrais viennent du listener Firestore.
+      const drivers = await dataService.getDrivers();
       setAllDrivers(drivers);
-      setAllVehicles(vehicles);
     } catch (error) {
       console.error('Error loading reference data:', error);
     }
@@ -153,6 +151,12 @@ export function MissionsView() {
   // dans le suivi GPS (sinon affichage "Chauffeur Inconnu").
   useEffect(() => {
     const unsubscribe = FirestoreDriverService.allDriversListener(setFirestoreDrivers);
+    return () => unsubscribe();
+  }, []);
+
+  // 1ter. Écouter les véhicules persistés (Firestore) pour résoudre les plaques.
+  useEffect(() => {
+    const unsubscribe = FirestoreVehicleService.allVehiclesListener(setFirestoreVehicles);
     return () => unsubscribe();
   }, []);
 
@@ -171,8 +175,8 @@ export function MissionsView() {
   //    + véhicule. Recalculé quand les missions brutes OU les chauffeurs/véhicules
   //    changent, sans toucher à l'abonnement Firestore.
   const missions = useMemo<Mission[]>(
-    () => rawMissions.map((fm) => buildMission(fm, firestoreDrivers, allDrivers, allVehicles)),
-    [rawMissions, firestoreDrivers, allDrivers, allVehicles]
+    () => rawMissions.map((fm) => buildMission(fm, firestoreDrivers, allDrivers, firestoreVehicles)),
+    [rawMissions, firestoreDrivers, allDrivers, firestoreVehicles]
   );
 
   // 4. Log temps réel des transitions de statut (ex. mission terminée depuis le mobile).

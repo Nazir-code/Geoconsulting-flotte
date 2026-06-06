@@ -5,8 +5,8 @@ import { VehicleCard } from './VehicleCard';
 import { DriverCard } from './DriverCard';
 import { CreateVehicleForm } from './CreateVehicleForm';
 import { AddDriverModal } from './AddDriverModal';
-import { dataService } from '@/services/dataService';
 import { FirestoreDriverService } from '@/services/firestoreDriverService';
+import { FirestoreVehicleService } from '@/services/firestoreVehicleService';
 import type { Vehicle, Driver, User } from '@/types';
 import { cn } from '@/lib/utils';
 import { EmptyState, Skeleton, SkeletonList } from '@/components/common';
@@ -24,8 +24,11 @@ export function FleetView() {
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
 
   useEffect(() => {
-    // 1. Charger les véhicules (Mock)
-    loadVehicles();
+    // 1. Écouter les véhicules en temps réel (Firestore — persistant)
+    const unsubscribeVehicles = FirestoreVehicleService.allVehiclesListener((firestoreVehicles) => {
+      setVehicles(firestoreVehicles);
+      setIsLoading(false);
+    });
 
     // 2. Écouter les chauffeurs en temps réel (Firestore)
     const unsubscribe = FirestoreDriverService.allDriversListener((firestoreDrivers) => {
@@ -62,22 +65,16 @@ export function FleetView() {
       setIsLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribeVehicles();
+      unsubscribe();
+    };
   }, []);
-
-  const loadVehicles = async () => {
-    try {
-      const vehiclesData = await dataService.getVehicles();
-      setVehicles(vehiclesData);
-    } catch (error) {
-      console.error('Error loading vehicles:', error);
-    }
-  };
 
   const handleCreateVehicle = async (data: Omit<Vehicle, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
-      const newVehicle = await dataService.createVehicle(data);
-      setVehicles([...vehicles, newVehicle]);
+      // Le listener temps réel mettra la liste à jour automatiquement.
+      await FirestoreVehicleService.createVehicle(data);
       setShowVehicleForm(false);
     } catch (error) {
       console.error('Erreur lors de la création du véhicule:', error);
@@ -89,8 +86,7 @@ export function FleetView() {
     if (!editingVehicle) return;
 
     try {
-      const updatedVehicle = await dataService.updateVehicle(editingVehicle.id, data);
-      setVehicles(vehicles.map(v => v.id === editingVehicle.id ? updatedVehicle : v));
+      await FirestoreVehicleService.updateVehicle(editingVehicle.id, data);
       setShowVehicleForm(false);
       setEditingVehicle(null);
     } catch (error) {
@@ -101,8 +97,7 @@ export function FleetView() {
 
   const handleDeleteVehicle = async (id: string) => {
     try {
-      await dataService.deleteVehicle(id);
-      setVehicles(vehicles.filter(v => v.id !== id));
+      await FirestoreVehicleService.deleteVehicle(id);
     } catch (error) {
       console.error('Erreur lors de la suppression du véhicule:', error);
       alert('Erreur lors de la suppression du véhicule');

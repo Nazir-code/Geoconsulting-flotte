@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { MapPin, FileText, User, Car, Calendar, Play } from 'lucide-react';
-import { dataService } from '@/services/dataService';
-import { FirestoreMissionService } from '@/services/firestoreMissionService';
+import { FirestoreMissionService, type Mission as FirestoreMission } from '@/services/firestoreMissionService';
 import { FirestoreDriverService, type Driver as FirestoreDriver } from '@/services/firestoreDriverService';
+import { FirestoreVehicleService } from '@/services/firestoreVehicleService';
 import { useAuth } from '@/context/AuthContext_Firebase';
 import type { Vehicle } from '@/types';
 import { NIGER_CITIES, MISSION_PURPOSES } from '@/data/mockData';
@@ -27,20 +27,15 @@ export function CreateMissionForm({ onSuccess }: CreateMissionFormProps) {
 
   useEffect(() => {
     const unsubscribeDrivers = FirestoreDriverService.allDriversListener(setDrivers);
-    loadData();
-    return () => unsubscribeDrivers();
+    // Véhicules persistés (Firestore) — on ne propose que ceux disponibles.
+    const unsubscribeVehicles = FirestoreVehicleService.allVehiclesListener((all) => {
+      setVehicles(all.filter(v => v.status === 'available'));
+    });
+    return () => {
+      unsubscribeDrivers();
+      unsubscribeVehicles();
+    };
   }, []);
-
-  const loadData = async () => {
-    try {
-      const vehiclesData = await dataService
-        .getVehicles()
-        .then(v => v.filter(ve => ve.status === 'available'));
-      setVehicles(vehiclesData);
-    } catch (error) {
-      console.error('Error loading data:', error);
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,9 +50,10 @@ export function CreateMissionForm({ onSuccess }: CreateMissionFormProps) {
         priority: 'medium',
         assignedTo: formData.driverId,
         createdBy: user?.id || 'admin',
-        // Note: On ajoute vehicleId manuellement car il n'est pas encore dans l'interface typée mais utile pour le dashboard
+        // Note: vehicleId n'est pas dans l'interface Mission typée mais est utile
+        // pour rattacher la mission au véhicule (suivi, coûts).
         vehicleId: formData.vehicleId,
-      } as any);
+      } as Omit<FirestoreMission, 'id' | 'createdAt' | 'updatedAt' | 'status'> & { vehicleId: string });
       
       setFormData({
         destination: '',

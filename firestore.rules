@@ -50,6 +50,15 @@ service cloud.firestore {
       allow create, delete: if isAuthenticated() && isManager();
     }
 
+    // Collection: Vehicles
+    match /vehicles/{vehicleId} {
+      // Lecture pour tout utilisateur authentifié (web + mobile)
+      allow read: if isAuthenticated();
+
+      // Création / modification / suppression réservées aux managers
+      allow create, update, delete: if isAuthenticated() && isManager();
+    }
+
     // Collection: fuel_records (optionnel, si implémenté)
     match /fuel_records/{recordId} {
       allow read, write: if isAuthenticated() && (resource.data.driverId == request.auth.uid || isManager());
