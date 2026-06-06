@@ -56,21 +56,36 @@ class AuthService {
   }
 
   /// Déconnexion
-  /// Met le statut à "offline" avant de déconnecter
+  /// Met le statut à "offline" et retire le token FCM avant de déconnecter.
+  ///
+  /// IMPORTANT : ces opérations de nettoyage sont "best-effort" et bornées
+  /// dans le temps. Sur certains téléphones (MIUI/Xiaomi notamment),
+  /// `getToken()` peut se bloquer indéfiniment ; sans timeout, la
+  /// déconnexion réelle (`_auth.signOut()`) ne serait jamais atteinte.
   Future<void> signOut() async {
-    try {
-      final uid = _auth.currentUser?.uid;
-      if (uid != null) {
-        await FirebaseNotificationService.instance.stopForDriver();
-        // Marquer comme hors ligne dans Firestore avant de déconnecter
-        await _firestoreService.updateStatus(
-          uid: uid,
-          status: 'offline',
-        );
+    final uid = _auth.currentUser?.uid;
+
+    if (uid != null) {
+      // Marquer hors ligne dans Firestore (tant qu'on est encore authentifié)
+      try {
+        await _firestoreService
+            .updateStatus(uid: uid, status: 'offline')
+            .timeout(const Duration(seconds: 2));
+      } catch (e) {
+        print("Statut offline ignoré (timeout/erreur): $e");
       }
-    } catch (e) {
-      print("Erreur mise à jour statut avant déconnexion: $e");
+
+      // Retirer le token FCM
+      try {
+        await FirebaseNotificationService.instance
+            .stopForDriver()
+            .timeout(const Duration(seconds: 2));
+      } catch (e) {
+        print("Retrait token FCM ignoré (timeout/erreur): $e");
+      }
     }
+
+    // Action critique : TOUJOURS exécutée, quoi qu'il arrive ci-dessus.
     await _auth.signOut();
   }
 
