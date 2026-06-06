@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Route, RefreshCw, Satellite, List } from 'lucide-react';
 import { MissionCard } from './MissionCard';
@@ -6,7 +6,8 @@ import { CreateMissionForm } from './CreateMissionForm';
 import { CreateMissionFirebaseForm } from './CreateMissionFirebaseForm';
 import { LiveTrackingView } from './LiveTrackingView';
 import { dataService } from '@/services/dataService';
-import { FirestoreMissionService, normalizeMissionStatus } from '@/services/firestoreMissionService';
+import { FirestoreMissionService, normalizeMissionStatus, type Mission as FirestoreMission } from '@/services/firestoreMissionService';
+import { FirestoreDriverService, type Driver as FirestoreDriver } from '@/services/firestoreDriverService';
 import type { Mission, MissionStatus, Driver, Vehicle } from '@/types';
 import { cn } from '@/lib/utils';
 import { EmptyState, SkeletonList, useToast } from '@/components/common';
@@ -14,14 +15,117 @@ import { EmptyState, SkeletonList, useToast } from '@/components/common';
 type FilterStatus = 'all' | MissionStatus;
 type ActiveTab = 'missions' | 'tracking' | 'create-firebase';
 
+// Convertit un chauffeur Firestore (champ `name` plat + uid) vers le type Driver
+// de l'app (structure `user.firstName` / `user.lastName` attendue par l'UI de suivi).
+function mapFirestoreDriver(rd: FirestoreDriver): Driver {
+  const label = (rd.name || rd.email || 'Chauffeur').trim();
+  const parts = label.split(/\s+/);
+  const firstName = parts[0] || 'Chauffeur';
+  const lastName = parts.slice(1).join(' ');
+  const nowIso = new Date().toISOString();
+  return {
+    id: rd.uid,
+    userId: rd.uid,
+    user: {
+      id: rd.uid,
+      email: rd.email || '',
+      firstName,
+      lastName,
+      role: 'driver',
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    },
+    status: rd.status === 'online' ? 'active' : 'off',
+    rating: 0,
+    totalMissions: 0,
+    licenseNumber: '',
+    licenseExpiry: nowIso,
+    createdAt: nowIso,
+    updatedAt: nowIso,
+  };
+}
+
+// Construit une Mission (type app) depuis une mission Firestore brute, en résolvant
+// le chauffeur (Firestore prioritaire, sinon mock) et le véhicule.
+function buildMission(
+  fm: FirestoreMission,
+  firestoreDrivers: FirestoreDriver[],
+  allDrivers: Driver[],
+  allVehicles: Vehicle[]
+): Mission {
+  const vehicleId = (fm as FirestoreMission & { vehicleId?: string }).vehicleId;
+  const nowIso = new Date().toISOString();
+
+  // Priorité au vrai chauffeur Firestore (uid === assignedTo), fallback sur mock.
+  const realDriver = firestoreDrivers.find(d => d.uid === fm.assignedTo);
+  const driver = realDriver
+    ? mapFirestoreDriver(realDriver)
+    : allDrivers.find(d => d.id === fm.assignedTo || d.userId === fm.assignedTo);
+  const vehicle = allVehicles.find(v => v.id === vehicleId);
+
+  // Driver par défaut (évite un crash UI si le chauffeur est introuvable)
+  const defaultDriver: Driver = {
+    id: fm.assignedTo || 'unknown',
+    userId: fm.assignedTo || 'unknown',
+    user: {
+      id: 'unknown',
+      email: 'unknown@example.com',
+      firstName: 'Chauffeur',
+      lastName: 'Inconnu',
+      role: 'driver',
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    },
+    status: 'active',
+    rating: 0,
+    totalMissions: 0,
+    licenseNumber: 'TEMP-001',
+    licenseExpiry: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+    createdAt: nowIso,
+    updatedAt: nowIso,
+  };
+
+  const defaultVehicle: Vehicle = {
+    id: vehicleId || 'v-default',
+    plateNumber: 'N/A',
+    brand: 'Véhicule',
+    model: 'Assigné',
+    type: 'truck',
+    status: 'available',
+    year: 2024,
+    mileage: 0,
+    fuelType: 'diesel',
+    createdAt: nowIso,
+    updatedAt: nowIso,
+  };
+
+  return {
+    id: fm.id,
+    driverId: fm.assignedTo,
+    driver: driver || defaultDriver,
+    vehicleId: vehicleId || 'v-default',
+    vehicle: vehicle || defaultVehicle,
+    destination: fm.location || 'Destination inconnue',
+    purpose: fm.title || fm.description || 'Mission de transport',
+    startTime: fm.createdAt?.toDate?.()?.toISOString() || nowIso,
+    endTime: fm.completedAt?.toDate?.()?.toISOString(),
+    status: normalizeMissionStatus(fm.status) as MissionStatus,
+    startLocation: 'Niamey',
+    createdAt: fm.createdAt?.toDate?.()?.toISOString() || nowIso,
+    updatedAt: fm.updatedAt?.toDate?.()?.toISOString() || nowIso,
+  };
+}
+
 export function MissionsView() {
   const toast = useToast();
-  const [missions, setMissions] = useState<Mission[]>([]);
+  const [rawMissions, setRawMissions] = useState<FirestoreMission[]>([]);
   const [filter, setFilter] = useState<FilterStatus>('all');
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<ActiveTab>('missions');
   const [allDrivers, setAllDrivers] = useState<Driver[]>([]);
   const [allVehicles, setAllVehicles] = useState<Vehicle[]>([]);
+  // Vrais chauffeurs Firestore (uid = assignedTo) pour résoudre les noms.
+  const [firestoreDrivers, setFirestoreDrivers] = useState<FirestoreDriver[]>([]);
 
   // Suivi des statuts précédents pour logger les transitions temps réel
   const prevStatusesRef = useRef<Record<string, string>>({});
@@ -45,102 +149,54 @@ export function MissionsView() {
     loadReferenceData();
   }, [loadReferenceData]);
 
-  // 2. Écouter les missions en temps réel
+  // 1bis. Écouter les vrais chauffeurs Firestore pour résoudre leurs noms
+  // dans le suivi GPS (sinon affichage "Chauffeur Inconnu").
   useEffect(() => {
-    // Subscribe to Firestore missions real-time
-    const unsubscribe = FirestoreMissionService.allMissionsListener(async (firestoreMissions) => {
-      // Pour chaque mission Firestore, on doit trouver le driver et le véhicule correspondants
-      // Note: Dans une version finale, ces objets devraient aussi venir de Firestore
-      const mappedMissions: Mission[] = firestoreMissions.map(fm => {
-        // Recherche du driver (soit par ID interne, soit par UID Firebase)
-        const driver = allDrivers.find(d => d.id === fm.assignedTo || d.userId === fm.assignedTo);
-        const vehicle = allVehicles.find(v => v.id === (fm as any).vehicleId);
+    const unsubscribe = FirestoreDriverService.allDriversListener(setFirestoreDrivers);
+    return () => unsubscribe();
+  }, []);
 
-        // Création d'un driver par défaut si non trouvé pour éviter le crash UI
-        const defaultDriver: Driver = {
-          id: fm.assignedTo || 'unknown',
-          userId: fm.assignedTo || 'unknown',
-          user: {
-            id: 'unknown',
-            email: 'unknown@example.com',
-            firstName: 'Chauffeur',
-            lastName: 'Inconnu',
-            role: 'driver' as const,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          },
-          status: 'active' as const,
-          rating: 0,
-          totalMissions: 0,
-          licenseNumber: 'TEMP-001',
-          licenseExpiry: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-
-        const defaultVehicle: Vehicle = {
-          id: (fm as any).vehicleId || 'v-default',
-          plateNumber: 'N/A',
-          brand: 'Véhicule',
-          model: 'Assigné',
-          type: 'truck',
-          status: 'available',
-          year: 2024,
-          mileage: 0,
-          fuelType: 'diesel',
-          // lastService: new Date().toISOString(), // Commented - not in Vehicle type
-          // nextService: new Date().toISOString(), // Commented - not in Vehicle type
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-
-        return {
-          id: fm.id,
-          driverId: fm.assignedTo,
-          driver: driver || defaultDriver,
-          vehicleId: (fm as any).vehicleId || 'v-default',
-          vehicle: vehicle || defaultVehicle,
-          destination: fm.location || 'Destination inconnue',
-          purpose: fm.title || fm.description || 'Mission de transport',
-          startTime: fm.createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
-          endTime: fm.completedAt?.toDate?.()?.toISOString(),
-          status: normalizeMissionStatus(fm.status) as MissionStatus,
-          startLocation: 'Niamey',
-          createdAt: fm.createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
-          updatedAt: fm.updatedAt?.toDate?.()?.toISOString() || new Date().toISOString(),
-        };
-      });
-
-      // ── Log temps réel : détecter les transitions de statut ──────────────
-      // Notamment les missions qui viennent de passer à "terminée" depuis le
-      // mobile (bouton "Terminer la mission" du chauffeur).
-      const prev = prevStatusesRef.current;
-      mappedMissions.forEach((m) => {
-        const before = prev[m.id];
-        if (before && before !== m.status) {
-          console.log(
-            `🔄 [Manager/Realtime] Mission ${m.id} : "${before}" → "${m.status}"`,
-            { destination: m.destination, driver: m.driverId }
-          );
-          if (m.status === 'terminée') {
-            console.log(
-              `✅ [Manager/Realtime] Mission TERMINÉE reçue en temps réel : ${m.id}`,
-              { endTime: m.endTime }
-            );
-          }
-        }
-      });
-      // Mémoriser les statuts courants pour la prochaine comparaison
-      prevStatusesRef.current = Object.fromEntries(
-        mappedMissions.map((m) => [m.id, m.status as string])
-      );
-
-      setMissions(mappedMissions);
+  // 2. Écouter les missions en temps réel — stockage BRUT uniquement.
+  //    L'abonnement est ouvert une seule fois (deps []) ; il ne dépend pas des
+  //    chauffeurs (qui changent à chaque tick GPS) → pas de réabonnement en boucle.
+  useEffect(() => {
+    const unsubscribe = FirestoreMissionService.allMissionsListener((firestoreMissions) => {
+      setRawMissions(firestoreMissions);
       setIsLoading(false);
     });
-
     return () => unsubscribe();
-  }, [allDrivers, allVehicles]); // On garde ces dépendances pour re-mapper si les drivers/vehicules changent, MAIS sans rappeler loadReferenceData
+  }, []);
+
+  // 3. Construire les missions affichées : résolution chauffeur (Firestore puis mock)
+  //    + véhicule. Recalculé quand les missions brutes OU les chauffeurs/véhicules
+  //    changent, sans toucher à l'abonnement Firestore.
+  const missions = useMemo<Mission[]>(
+    () => rawMissions.map((fm) => buildMission(fm, firestoreDrivers, allDrivers, allVehicles)),
+    [rawMissions, firestoreDrivers, allDrivers, allVehicles]
+  );
+
+  // 4. Log temps réel des transitions de statut (ex. mission terminée depuis le mobile).
+  useEffect(() => {
+    const prev = prevStatusesRef.current;
+    missions.forEach((m) => {
+      const before = prev[m.id];
+      if (before && before !== m.status) {
+        console.log(
+          `🔄 [Manager/Realtime] Mission ${m.id} : "${before}" → "${m.status}"`,
+          { destination: m.destination, driver: m.driverId }
+        );
+        if (m.status === 'terminée') {
+          console.log(
+            `✅ [Manager/Realtime] Mission TERMINÉE reçue en temps réel : ${m.id}`,
+            { endTime: m.endTime }
+          );
+        }
+      }
+    });
+    prevStatusesRef.current = Object.fromEntries(
+      missions.map((m) => [m.id, m.status as string])
+    );
+  }, [missions]);
 
   const filteredMissions = missions.filter(mission =>
     filter === 'all' || mission.status === filter
