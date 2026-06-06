@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_compass/flutter_compass.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
@@ -34,7 +35,10 @@ class _DriverHomeState extends State<DriverHome> {
   DriverProfile? _profile;
   StreamSubscription<QuerySnapshot>? _missionSubscription;
   StreamSubscription<Position>? _gpsSubscription;
+  StreamSubscription<CompassEvent>? _compassSubscription;
   LatLng _currentLocation = const LatLng(13.5137, 2.1098);
+  double _headingTurns = 0.0;
+  double _lastRawHeading = 0.0;
 
   // IDs des missions déjà présentes au démarrage du listener (snapshot initial).
   // Approche par Set plutôt que comparaison de Timestamp — évite le décalage
@@ -66,6 +70,11 @@ class _DriverHomeState extends State<DriverHome> {
       }
     });
 
+    _compassSubscription = FlutterCompass.events?.listen((event) {
+      if (!mounted || event.heading == null || event.heading!.isNaN) return;
+      _applyCompassHeading(event.heading!);
+    });
+
     final lastPos = NewLocationService().lastKnownPosition;
     if (lastPos != null) {
       _currentLocation = LatLng(lastPos.latitude, lastPos.longitude);
@@ -75,9 +84,22 @@ class _DriverHomeState extends State<DriverHome> {
   @override
   void dispose() {
     _gpsSubscription?.cancel();
+    _compassSubscription?.cancel();
     GpsLifecycleManager().onPermissionDenied = null;
     _missionSubscription?.cancel();
     super.dispose();
+  }
+
+  void _applyCompassHeading(double rawHeading) {
+    double h = rawHeading % 360;
+    if (h < 0) h += 360;
+
+    double delta = h - _lastRawHeading;
+    if (delta > 180) delta -= 360;
+    if (delta < -180) delta += 360;
+
+    _lastRawHeading = h;
+    setState(() => _headingTurns += delta / 360.0);
   }
 
   Future<void> _loadProfile() async {
@@ -366,7 +388,12 @@ class _DriverHomeState extends State<DriverHome> {
                           shape: BoxShape.circle,
                           boxShadow: AppTheme.shadowColored(AppColors.primary),
                         ),
-                        child: const Icon(Icons.navigation_rounded, color: Colors.white, size: 18),
+                        child: AnimatedRotation(
+                          turns: _headingTurns,
+                          duration: const Duration(milliseconds: 150),
+                          curve: Curves.easeOut,
+                          child: const Icon(Icons.navigation_rounded, color: Colors.white, size: 18),
+                        ),
                       ),
                     ),
                   ],

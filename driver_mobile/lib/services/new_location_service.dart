@@ -158,7 +158,8 @@ class NewLocationService {
     debugPrint(
       '[GPS_WRITE] lat=${position.latitude.toStringAsFixed(6)} '
       'lng=${position.longitude.toStringAsFixed(6)} '
-      'acc=${position.accuracy.toStringAsFixed(1)}m',
+      'acc=${position.accuracy.toStringAsFixed(1)}m '
+      'heading=${position.heading.toStringAsFixed(1)}°',
     );
 
     // IMPORTANT : champ 'status' intentionnellement absent.
@@ -166,6 +167,7 @@ class NewLocationService {
     _firestore.collection('drivers').doc(uid).update({
       'latitude': position.latitude,
       'longitude': position.longitude,
+      'heading': position.heading >= 0 ? position.heading : 0.0,
       'lastLocationUpdate': FieldValue.serverTimestamp(),
       'lastSeen': FieldValue.serverTimestamp(),
     }).catchError((e) => debugPrint('[GPS_WRITE_ERROR] $e'));

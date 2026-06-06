@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_compass/flutter_compass.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -25,10 +26,13 @@ class _TrackingScreenState extends State<TrackingScreen>
   final String _uid = FirebaseAuth.instance.currentUser?.uid ?? "";
 
   LatLng _currentLatLng = const LatLng(13.5137, 2.1098);
+  double _headingTurns = 0.0;   // cumulative turns for AnimatedRotation
+  double _lastRawHeading = 0.0; // last raw compass value (0–360)
   bool _isUpdatingMission = false;   // protège le bouton Arrêter
   bool _isCompletingMission = false; // protège le bouton Terminer
   bool _followMode = true;
   StreamSubscription<Position>? _gpsSubscription;
+  StreamSubscription<CompassEvent>? _compassSubscription;
 
   bool get _isTracking => GpsLifecycleManager().isGpsActive;
 
@@ -43,6 +47,11 @@ class _TrackingScreenState extends State<TrackingScreen>
 
     _gpsSubscription = NewLocationService().positionStream.listen(_onNewPosition);
 
+    _compassSubscription = FlutterCompass.events?.listen((event) {
+      if (!mounted || event.heading == null || event.heading!.isNaN) return;
+      _applyCompassHeading(event.heading!);
+    });
+
     if (!GpsLifecycleManager().isGpsActive) {
       GpsLifecycleManager().forceStartGps();
     }
@@ -55,6 +64,7 @@ class _TrackingScreenState extends State<TrackingScreen>
   @override
   void dispose() {
     _gpsSubscription?.cancel();
+    _compassSubscription?.cancel();
     super.dispose();
   }
 
@@ -65,6 +75,20 @@ class _TrackingScreenState extends State<TrackingScreen>
     if (_followMode) {
       _mapController.move(newLatLng, _mapController.camera.zoom);
     }
+  }
+
+  // Converts raw compass degrees to cumulative turns, always taking the
+  // shortest angular path (handles the 350°→10° wraparound correctly).
+  void _applyCompassHeading(double rawHeading) {
+    double h = rawHeading % 360;
+    if (h < 0) h += 360;
+
+    double delta = h - _lastRawHeading;
+    if (delta > 180) delta -= 360;
+    if (delta < -180) delta += 360;
+
+    _lastRawHeading = h;
+    setState(() => _headingTurns += delta / 360.0);
   }
 
   Future<void> _toggleTracking() async {
@@ -392,7 +416,10 @@ class _TrackingScreenState extends State<TrackingScreen>
                     point: _currentLatLng,
                     width: 64,
                     height: 64,
-                    child: _PulseMarker(isActive: _isTracking),
+                    child: _PulseMarker(
+                      isActive: _isTracking,
+                      turns: _headingTurns,
+                    ),
                   ),
                 ],
               ),
@@ -808,7 +835,8 @@ class _MapFloatButton extends StatelessWidget {
 // ── Animated driver marker ────────────────────────────────────────────────────
 class _PulseMarker extends StatefulWidget {
   final bool isActive;
-  const _PulseMarker({required this.isActive});
+  final double turns;
+  const _PulseMarker({required this.isActive, this.turns = 0.0});
 
   @override
   State<_PulseMarker> createState() => _PulseMarkerState();
@@ -876,7 +904,7 @@ class _PulseMarkerState extends State<_PulseMarker>
               color: color.withValues(alpha: 0.15),
             ),
           ),
-          // Inner dot
+          // Inner dot — smooth animated rotation via cumulative turns
           Container(
             width: 26,
             height: 26,
@@ -885,10 +913,15 @@ class _PulseMarkerState extends State<_PulseMarker>
               color: Colors.white,
               boxShadow: AppTheme.shadowMd,
             ),
-            child: Icon(
-              Icons.navigation_rounded,
-              color: color,
-              size: 16,
+            child: AnimatedRotation(
+              turns: widget.turns,
+              duration: const Duration(milliseconds: 150),
+              curve: Curves.easeOut,
+              child: Icon(
+                Icons.navigation_rounded,
+                color: color,
+                size: 18,
+              ),
             ),
           ),
         ],
