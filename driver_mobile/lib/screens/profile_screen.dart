@@ -5,6 +5,7 @@ import '../services/firestore_service.dart';
 import '../models/driver_profile.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ds_badge.dart';
+import 'splash_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -448,6 +449,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
           TextButton(
             onPressed: () {
               Navigator.pop(ctx);
+              // Réafficher le splash (logo) AVANT de revenir à la connexion.
+              // On remplace toute la pile : l'ancien AuthWrapper est retiré,
+              // le splash relance ensuite le flux (utilisateur déconnecté → login).
+              Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const SplashScreen()),
+                (route) => false,
+              );
               _authService.signOut();
             },
             child: Text(

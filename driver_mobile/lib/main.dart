@@ -5,6 +5,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 import 'firebase_options.dart';
+import 'screens/splash_screen.dart';
 import 'screens/main_navigation_screen.dart';
 import 'screens/login_screen.dart';
 import 'services/auth_service.dart';
@@ -58,7 +59,9 @@ class DriverMobileApp extends StatelessWidget {
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.system,
-      home: const AuthWrapper(),
+      // Écran initial : Splash animé → redirige ensuite vers AuthWrapper,
+      // qui décide accueil/connexion et démarre FCM + GPS.
+      home: const SplashScreen(),
       routes: {
         '/login': (_) => const LoginScreen(),
         '/home': (_) => const MainNavigationScreen(),
