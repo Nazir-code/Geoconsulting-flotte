@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AuthProvider, useAuth } from '@/context/AuthContext_Firebase';
 import { ThemeProvider } from '@/context/ThemeContext';
@@ -32,6 +32,20 @@ function AppContent() {
   const { isAuthenticated } = useAuth();
   const [showLoader, setShowLoader] = useState(true);
   const [activeSection, setActiveSection] = useState('dashboard');
+  // Incrémenté par le bouton refresh du TopBar : force le remontage de la
+  // section active → tous ses chargements (listeners, fetch) se relancent.
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // Navigation inter-sections déclenchée par des boutons enfants
+  // (ex. « Voir tout », « Voir toutes les maintenances ») via un event léger.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const section = (e as CustomEvent<string>).detail;
+      if (section) setActiveSection(section);
+    };
+    window.addEventListener('navigate-section', handler);
+    return () => window.removeEventListener('navigate-section', handler);
+  }, []);
 
   // Handle loader completion
   const handleLoaderComplete = () => {
@@ -76,13 +90,16 @@ function AppContent() {
         />
 
         {/* Top Bar */}
-        <TopBar title={sectionTitles[activeSection] || 'FleetNexus'} />
+        <TopBar
+          title={sectionTitles[activeSection] || 'FleetNexus'}
+          onRefresh={() => setRefreshKey((k) => k + 1)}
+        />
 
         {/* Main Content */}
         <main className="main-content">
           <AnimatePresence mode="wait">
             <motion.div
-              key={activeSection}
+              key={`${activeSection}-${refreshKey}`}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}

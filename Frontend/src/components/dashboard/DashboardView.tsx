@@ -9,9 +9,10 @@ import { MaintenancePanel } from './MaintenancePanel';
 import { MissionsOverview } from './MissionsOverview';
 import { DriversOverview } from './DriversOverview';
 import { SkeletonKPICard } from '@/components/common';
-import { dataService } from '@/services/dataService';
 import { FirestoreDriverService } from '@/services/firestoreDriverService';
 import { FirestoreMissionService } from '@/services/firestoreMissionService';
+import { FirestoreVehicleService } from '@/services/firestoreVehicleService';
+import { FirestoreFuelService } from '@/services/firestoreFuelService';
 import type { DashboardStats, ActivityItem, Mission } from '@/types';
 
 export function DashboardView() {
@@ -30,10 +31,32 @@ export function DashboardView() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // 1. Initialiser les stats avec les données de base (véhicules encore mockés)
-    loadInitialStats();
+    // 1. Véhicules en temps réel → total + alertes (véhicules en maintenance / indisponibles)
+    const unsubscribeVehicles = FirestoreVehicleService.allVehiclesListener((vehicles) => {
+      const needAttention = vehicles.filter(
+        (v) => v.status === 'maintenance' || v.status === 'unavailable'
+      ).length;
+      setStats((prev) => ({
+        ...prev,
+        totalVehicles: vehicles.length,
+        maintenanceAlerts: needAttention,
+      }));
+      setIsLoading(false);
+    });
 
-    // 2. Écouter les chauffeurs en temps réel
+    // 2. Coût carburant du mois en cours (réel, depuis fuel_records)
+    const unsubscribeFuel = FirestoreFuelService.allFuelRecordsListener((records) => {
+      const now = new Date();
+      const monthly = records
+        .filter((r) => {
+          const d = new Date(r.date);
+          return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+        })
+        .reduce((s, r) => s + (r.totalCost || 0), 0);
+      setStats((prev) => ({ ...prev, monthlyFuelCost: monthly }));
+    });
+
+    // 3. Écouter les chauffeurs en temps réel
     const unsubscribeDrivers = FirestoreDriverService.allDriversListener((drivers) => {
       // Compteurs d'affichage dérivés du flux déjà abonné (présentation only).
       const active = drivers.filter((d) => d.status === 'online').length;
@@ -80,31 +103,13 @@ export function DashboardView() {
       setActivities(missionActivities);
     });
 
-    // Subscriptions mock pour le reste (fuel, maintenance)
-    const unsubscribeStats = dataService.subscribe('stats_update', (newStats: any) => {
-      if (newStats) {
-        setStats(prev => ({ ...prev, ...newStats }));
-      }
-    });
-
     return () => {
+      unsubscribeVehicles();
+      unsubscribeFuel();
       unsubscribeDrivers();
       unsubscribeMissions();
-      unsubscribeStats();
     };
   }, []);
-
-  const loadInitialStats = async () => {
-    try {
-      const statsData = await dataService.getDashboardStats();
-      setStats(prev => ({ ...prev, ...statsData }));
-
-      // On garde isLoading false dès qu'on a les premières données
-      setIsLoading(false);
-    } catch (error) {
-      console.error('Error loading dashboard data:', error);
-    }
-  };
 
   if (isLoading) {
     return (
@@ -134,8 +139,6 @@ export function DashboardView() {
         <KPICard
           title="Total Véhicules"
           value={stats.totalVehicles}
-          change={3}
-          changeLabel="+3 ce mois"
           icon={Car}
           color="cyan"
           delay={0}
@@ -158,8 +161,6 @@ export function DashboardView() {
           title="Coût Carburant"
           value={stats.monthlyFuelCost}
           suffix="FCFA"
-          change={12}
-          changeLabel="vs mois dernier"
           icon={Fuel}
           color="orange"
           delay={0.3}

@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { MapPin, ArrowRight, CheckCircle, XCircle, User, Car } from 'lucide-react';
+import { MapPin, ArrowRight, CheckCircle, XCircle, User, Car, Trash2, Eye } from 'lucide-react';
 import type { Mission } from '@/types';
 import { formatDateTime } from '@/lib/utils';
 import { StatusChip } from '@/components/common';
@@ -9,9 +9,11 @@ interface MissionCardProps {
   index: number;
   onComplete?: (id: string) => void;
   onCancel?: (id: string) => void;
+  onDelete?: (id: string) => void;
+  onDetails?: (mission: Mission) => void;
 }
 
-export function MissionCard({ mission, index, onComplete, onCancel }: MissionCardProps) {
+export function MissionCard({ mission, index, onComplete, onCancel, onDelete, onDetails }: MissionCardProps) {
   const isActive = mission.status === 'en_cours' || mission.status === 'assignée';
 
   return (
@@ -90,19 +92,29 @@ export function MissionCard({ mission, index, onComplete, onCancel }: MissionCar
         </div>
 
         {/* Actions */}
-        {isActive && (
-          <div className="flex items-center gap-2 flex-wrap">
-            {mission.status === 'en_cours' && (
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => onComplete?.(mission.id)}
-                className="btn btn-secondary text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10"
-              >
-                <CheckCircle className="w-4 h-4" />
-                <span>Terminer</span>
-              </motion.button>
-            )}
+        <div className="flex items-center gap-2 flex-wrap">
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => onDetails?.(mission)}
+            className="btn btn-secondary text-accent-cyan border border-accent-cyan/40 hover:bg-accent-cyan/10"
+            title="Voir les détails de la mission"
+          >
+            <Eye className="w-4 h-4" />
+            <span>Détails</span>
+          </motion.button>
+          {mission.status === 'en_cours' && (
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => onComplete?.(mission.id)}
+              className="btn btn-secondary text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10"
+            >
+              <CheckCircle className="w-4 h-4" />
+              <span>Terminer</span>
+            </motion.button>
+          )}
+          {isActive && (
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -112,8 +124,19 @@ export function MissionCard({ mission, index, onComplete, onCancel }: MissionCar
               <XCircle className="w-4 h-4" />
               <span>Annuler</span>
             </motion.button>
-          </div>
-        )}
+          )}
+          {/* Suppression définitive — disponible pour toutes les missions */}
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => onDelete?.(mission.id)}
+            className="btn btn-secondary border border-red-500/50 hover:bg-red-500/10"
+            title="Supprimer définitivement la mission"
+          >
+            <Trash2 className="w-4 h-4 text-red-500" />
+            <span>Supprimer</span>
+          </motion.button>
+        </div>
 
         {/* Completed Info */}
         {mission.status === 'terminée' && mission.endTime && (

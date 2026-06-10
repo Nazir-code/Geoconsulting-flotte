@@ -1,55 +1,36 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Wrench, AlertTriangle, CheckCircle, Clock, Plus } from 'lucide-react';
-import { dataService } from '@/services/dataService';
-import type { MaintenanceRecord } from '@/types';
+import { Wrench, Plus, Car } from 'lucide-react';
+import { FirestoreVehicleService } from '@/services/firestoreVehicleService';
+import type { Vehicle } from '@/types';
 import { formatDate } from '@/lib/utils';
-import { StatusChip, EmptyState, Skeleton } from '@/components/common';
+import { EmptyState, Skeleton } from '@/components/common';
 
 interface MaintenancePanelProps {
   limit?: number;
 }
 
+const STATUS_LABEL: Record<string, string> = {
+  maintenance: 'En maintenance',
+  unavailable: 'Indisponible',
+};
+
 export function MaintenancePanel({ limit = 5 }: MaintenancePanelProps) {
-  const [maintenanceRecords, setMaintenanceRecords] = useState<MaintenanceRecord[]>([]);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    loadMaintenanceData();
-
-    // Subscribe to maintenance updates
-    const unsubscribe = dataService.subscribe('maintenance_update', () => {
-      loadMaintenanceData();
+    // Véhicules réels en temps réel ; on dérive ceux qui nécessitent un entretien.
+    const unsubscribe = FirestoreVehicleService.allVehiclesListener((all) => {
+      setVehicles(all);
+      setIsLoading(false);
     });
-
-    return unsubscribe;
+    return () => unsubscribe();
   }, []);
 
-  const loadMaintenanceData = async () => {
-    try {
-      const records = await dataService.getMaintenanceRecords();
-      setMaintenanceRecords(records.slice(0, limit));
-    } catch (error) {
-      console.error('Error loading maintenance data:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return <CheckCircle className="w-4 h-4 text-green-500" />;
-      case 'in_progress':
-        return <Clock className="w-4 h-4 text-blue-500" />;
-      case 'scheduled':
-        return <Clock className="w-4 h-4 text-yellow-500" />;
-      case 'overdue':
-        return <AlertTriangle className="w-4 h-4 text-red-500" />;
-      default:
-        return <Wrench className="w-4 h-4 text-gray-500" />;
-    }
-  };
+  const inMaintenance = vehicles
+    .filter((v) => v.status === 'maintenance' || v.status === 'unavailable')
+    .slice(0, limit);
 
   if (isLoading) {
     return (
@@ -88,60 +69,62 @@ export function MaintenancePanel({ limit = 5 }: MaintenancePanelProps) {
           </div>
           <div>
             <h3 className="font-semibold text-text-primary">Suivi d'Entretien</h3>
-            <p className="text-sm text-text-secondary">Maintenance & Réparations</p>
+            <p className="text-sm text-text-secondary">Véhicules en maintenance</p>
           </div>
         </div>
-        <button className="p-2 hover:bg-background-tertiary rounded-lg transition-colors">
+        <button
+          onClick={() => window.dispatchEvent(new CustomEvent('navigate-section', { detail: 'fuel' }))}
+          title="Gérer la maintenance"
+          className="p-2 hover:bg-background-tertiary rounded-lg transition-colors"
+        >
           <Plus className="w-4 h-4 text-text-secondary" />
         </button>
       </div>
 
       <div className="space-y-3">
-        {maintenanceRecords.length === 0 ? (
+        {inMaintenance.length === 0 ? (
           <EmptyState
             icon={Wrench}
-            title="Aucune maintenance en cours"
-            description="Les entretiens planifiés et en cours s'afficheront ici."
+            title="Aucun véhicule en maintenance"
+            description="Tous les véhicules de la flotte sont opérationnels."
           />
         ) : (
-          maintenanceRecords.map((record, index) => (
+          inMaintenance.map((v, index) => (
             <motion.div
-              key={record.id}
+              key={v.id}
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: index * 0.1 }}
               className="flex items-center justify-between p-3 bg-background-primary/50 rounded-lg border border-border/50 hover:border-border transition-colors"
             >
               <div className="flex items-center gap-3">
-                {getStatusIcon(record.status)}
+                <Car className="w-4 h-4 text-text-secondary" />
                 <div>
                   <p className="font-medium text-text-primary text-sm">
-                    {record.vehicle.plateNumber} - {record.vehicle.model}
+                    {v.plateNumber} — {v.model}
                   </p>
-                  <p className="text-xs text-text-secondary">
-                    {record.description}
-                  </p>
-                  <p className="text-xs text-text-secondary">
-                    {formatDate(record.scheduledDate)}
-                  </p>
+                  <p className="text-xs text-text-secondary">{v.brand}</p>
+                  {v.lastMaintenanceDate && (
+                    <p className="text-xs text-text-secondary">
+                      Dernier entretien : {formatDate(v.lastMaintenanceDate)}
+                    </p>
+                  )}
                 </div>
               </div>
-              <div className="text-right flex flex-col items-end gap-1">
-                <StatusChip status={record.status} size="sm" />
-                {record.cost && (
-                  <p className="text-xs text-text-secondary">
-                    {record.cost.toLocaleString()} FCFA
-                  </p>
-                )}
-              </div>
+              <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-accent-orange/10 text-accent-orange border border-accent-orange/30 whitespace-nowrap">
+                {STATUS_LABEL[v.status] || v.status}
+              </span>
             </motion.div>
           ))
         )}
       </div>
 
-      {maintenanceRecords.length >= limit && (
+      {inMaintenance.length >= limit && (
         <div className="mt-4 pt-4 border-t border-border">
-          <button className="w-full text-center text-sm text-cyan-500 hover:text-cyan-400 transition-colors">
+          <button
+            onClick={() => window.dispatchEvent(new CustomEvent('navigate-section', { detail: 'fuel' }))}
+            className="w-full text-center text-sm text-cyan-500 hover:text-cyan-400 transition-colors"
+          >
             Voir toutes les maintenances →
           </button>
         </div>

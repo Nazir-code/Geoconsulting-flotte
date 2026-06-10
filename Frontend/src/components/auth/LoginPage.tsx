@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Truck, Mail, Lock, Eye, EyeOff, AlertCircle, UserPlus } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, AlertCircle, UserPlus } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext_Firebase';
 import { AuthService } from '@/services/authService';
+import logoGeoconsulting from '@/assets/logo_geoconsulting.png';
 
 interface LoginPageProps {
   onLogin: () => void;
@@ -138,22 +139,24 @@ export function LoginPage({ onLogin }: LoginPageProps) {
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, ease: 'easeOut' }}
-        className="w-full max-w-md p-8 mx-4"
+        className="w-full max-w-sm p-4 mx-4"
       >
         {/* Logo */}
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ delay: 0.2, duration: 0.4 }}
-          className="text-center mb-10"
+          className="text-center mb-6"
         >
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-accent-cyan/20 to-accent-violet/20 border border-accent-cyan/30 mb-4">
-            <Truck className="w-8 h-8 text-accent-cyan" strokeWidth={1.5} />
-          </div>
-          <h1 className="text-3xl font-display font-bold text-text-primary mb-2">
+          <img
+            src={logoGeoconsulting}
+            alt="Geoconsulting"
+            className="inline-block w-14 h-14 rounded-2xl object-contain mb-3"
+          />
+          <h1 className="text-2xl font-display font-bold text-text-primary mb-1">
             Géo<span className="text-accent-cyan">Consulting.ne</span>
           </h1>
-          <p className="text-text-secondary">
+          <p className="text-sm text-text-secondary">
             {isSignUp ? 'Créer un compte manager' : 'Connectez-vous à votre compte'}
           </p>
         </motion.div>
@@ -164,7 +167,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3, duration: 0.4 }}
           onSubmit={handleSubmit}
-          className="glass-card p-8 space-y-6"
+          className="glass-card p-6 space-y-4"
         >
           {error && (
             <motion.div

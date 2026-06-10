@@ -1,9 +1,38 @@
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ThemeToggle } from '@/components/common/ThemeToggle';
 import { useTheme } from '@/context/ThemeContext';
 
+type Density = 'comfortable' | 'normal' | 'compact';
+const DENSITY_FONT_SIZE: Record<Density, string> = {
+  comfortable: '17px',
+  normal: '16px',
+  compact: '14px',
+};
+
 export function SettingsView() {
   const { theme } = useTheme();
+  // Init direct depuis localStorage (les prefs sont aussi appliquées au boot dans main.tsx).
+  const [density, setDensity] = useState<Density>(
+    () => (localStorage.getItem('ui-density') as Density) || 'normal'
+  );
+  const [animationsOn, setAnimationsOn] = useState(
+    () => localStorage.getItem('ui-animations') !== 'off'
+  );
+
+  const applyDensity = (value: Density) => {
+    setDensity(value);
+    localStorage.setItem('ui-density', value);
+    // Les espacements/typographies Tailwind sont en rem → changer la taille
+    // de base de <html> ajuste la densité de toute l'application.
+    document.documentElement.style.fontSize = DENSITY_FONT_SIZE[value];
+  };
+
+  const applyAnimations = (on: boolean) => {
+    setAnimationsOn(on);
+    localStorage.setItem('ui-animations', on ? 'on' : 'off');
+    document.documentElement.classList.toggle('reduce-motion', !on);
+  };
 
   return (
     <motion.div
@@ -109,10 +138,14 @@ export function SettingsView() {
                 <p className="text-text-primary font-medium">Densité de l'interface</p>
                 <p className="text-sm text-text-secondary">Ajustez l'espacement des éléments</p>
               </div>
-              <select className="input-field w-32">
-                <option>Confortable</option>
-                <option>Normal</option>
-                <option>Compact</option>
+              <select
+                value={density}
+                onChange={(e) => applyDensity(e.target.value as Density)}
+                className="input-field w-32"
+              >
+                <option value="comfortable">Confortable</option>
+                <option value="normal">Normal</option>
+                <option value="compact">Compact</option>
               </select>
             </div>
 
@@ -122,7 +155,12 @@ export function SettingsView() {
                 <p className="text-text-primary font-medium">Animations</p>
                 <p className="text-sm text-text-secondary">Activer les animations fluides</p>
               </div>
-              <input type="checkbox" defaultChecked className="w-5 h-5 rounded cursor-pointer" />
+              <input
+                type="checkbox"
+                checked={animationsOn}
+                onChange={(e) => applyAnimations(e.target.checked)}
+                className="w-5 h-5 rounded cursor-pointer"
+              />
             </div>
           </div>
         </motion.div>

@@ -96,6 +96,18 @@
   --skeleton-shine: rgba(15, 23, 42, 0.12);
 }
 
+/* =====================================================================
+   THÈME CLAIR — accents assombris pour le TEXTE.
+   Les accents néon (cyan/lime…) sont prévus pour le fond sombre et
+   deviennent illisibles sur blanc. On corrige uniquement la couleur de
+   texte (pas les fonds ni les bordures). Le sélecteur doublé
+   (.light .text-accent-*) passe devant l'utilitaire Tailwind.
+   ===================================================================== */
+.light .text-accent-cyan { color: #0E7490; }
+.light .text-accent-violet { color: #9333EA; }
+.light .text-accent-lime { color: #4D7C0F; }
+.light .text-accent-orange { color: #EA580C; }
+
 * {
   margin: 0;
   padding: 0;
@@ -159,6 +171,14 @@ body {
   outline: none;
   border-color: var(--border-active);
   box-shadow: 0 0 0 3px rgba(0, 240, 255, 0.12);
+}
+
+/* Champ avec icône à gauche (barres de recherche) :
+   padding-left élargi pour que le texte/placeholder ne chevauche pas l'icône.
+   Sélecteur doublé (.input-field.input-with-icon) pour passer devant le
+   padding raccourci de .input-field. */
+.input-field.input-with-icon {
+  padding-left: 2.5rem;
 }
 
 .form-group {
@@ -988,4 +1008,14 @@ body {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* Désactivation manuelle des animations (Paramètres → Animations) */
+.reduce-motion *,
+.reduce-motion *::before,
+.reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
 }

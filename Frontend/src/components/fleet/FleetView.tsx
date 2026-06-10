@@ -22,6 +22,8 @@ export function FleetView() {
   const [showVehicleForm, setShowVehicleForm] = useState(false);
   const [showDriverForm, setShowDriverForm] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
+  const [statusFilter, setStatusFilter] = useState<'all' | Vehicle['status']>('all');
+  const [showFilterMenu, setShowFilterMenu] = useState(false);
 
   useEffect(() => {
     // 1. Écouter les véhicules en temps réel (Firestore — persistant)
@@ -126,12 +128,16 @@ export function FleetView() {
     setEditingVehicle(null);
   };
 
-  const filteredVehicles = vehicles.filter(vehicle =>
-    searchQuery === '' ||
-    vehicle.plateNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    vehicle.brand.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    vehicle.model.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredVehicles = vehicles.filter((vehicle) => {
+    const q = searchQuery.toLowerCase();
+    const matchesSearch =
+      searchQuery === '' ||
+      vehicle.plateNumber.toLowerCase().includes(q) ||
+      vehicle.brand.toLowerCase().includes(q) ||
+      vehicle.model.toLowerCase().includes(q);
+    const matchesStatus = statusFilter === 'all' || vehicle.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
 
   const filteredDrivers = drivers.filter(driver =>
     searchQuery === '' ||
@@ -196,14 +202,54 @@ export function FleetView() {
               placeholder="Rechercher..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="input-field pl-10 w-64"
+              className="input-field input-with-icon w-64"
             />
           </div>
 
-          {/* Filter Button */}
-          <button className="p-2.5 border border-border rounded-lg hover:border-accent-cyan/30 hover:bg-accent-cyan/5 transition-all">
-            <Filter className="w-5 h-5 text-text-secondary" />
-          </button>
+          {/* Filter Button + menu (véhicules uniquement) */}
+          {activeTab === 'vehicles' && (
+            <div className="relative">
+              <button
+                onClick={() => setShowFilterMenu((s) => !s)}
+                title="Filtrer par statut"
+                className={cn(
+                  'p-2.5 border rounded-lg transition-all',
+                  statusFilter !== 'all'
+                    ? 'border-accent-cyan/50 bg-accent-cyan/10 text-accent-cyan'
+                    : 'border-border text-text-secondary hover:border-accent-cyan/30 hover:bg-accent-cyan/5'
+                )}
+              >
+                <Filter className="w-5 h-5" />
+              </button>
+              {showFilterMenu && (
+                <div className="absolute right-0 top-full mt-2 w-48 glass-card overflow-hidden z-50 py-1">
+                  {([
+                    { value: 'all', label: 'Tous les statuts' },
+                    { value: 'available', label: 'Disponible' },
+                    { value: 'on_mission', label: 'En mission' },
+                    { value: 'maintenance', label: 'Maintenance' },
+                    { value: 'unavailable', label: 'Indisponible' },
+                  ] as const).map((opt) => (
+                    <button
+                      key={opt.value}
+                      onClick={() => {
+                        setStatusFilter(opt.value);
+                        setShowFilterMenu(false);
+                      }}
+                      className={cn(
+                        'w-full text-left px-4 py-2 text-sm transition-colors',
+                        statusFilter === opt.value
+                          ? 'bg-accent-cyan/10 text-accent-cyan'
+                          : 'text-text-secondary hover:bg-background-secondary'
+                      )}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

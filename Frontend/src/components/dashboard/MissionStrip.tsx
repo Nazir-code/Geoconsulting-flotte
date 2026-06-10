@@ -22,7 +22,10 @@ export function MissionStrip({ missions }: MissionStripProps) {
         <h3 className="text-sm font-display font-semibold text-text-primary">
           Missions en cours
         </h3>
-        <button className="text-xs text-accent-cyan hover:text-accent-cyan/80 transition-colors">
+        <button
+          onClick={() => window.dispatchEvent(new CustomEvent('navigate-section', { detail: 'missions' }))}
+          className="text-xs text-accent-cyan hover:text-accent-cyan/80 transition-colors"
+        >
           Voir tout
         </button>
       </div>

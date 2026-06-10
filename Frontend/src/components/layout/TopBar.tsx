@@ -1,21 +1,31 @@
 import { motion } from 'framer-motion';
-import { Bell, Sun, Moon, MapPin } from 'lucide-react';
+import { Bell, Sun, Moon, MapPin, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext_Firebase';
 import { useTheme } from '@/context/ThemeContext';
 import { formatTime } from '@/lib/utils';
 import { useState, useEffect } from 'react';
-import { mockNotifications } from '@/data/mockData';
+import { FirestoreMissionService, type Mission as FirestoreMission } from '@/services/firestoreMissionService';
 
 interface TopBarProps {
   title: string;
+  onRefresh?: () => void;
 }
 
-export function TopBar({ title }: TopBarProps) {
+export function TopBar({ title, onRefresh }: TopBarProps) {
   const { user } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showNotifications, setShowNotifications] = useState(false);
-  const unreadCount = mockNotifications.filter(n => !n.isRead && n.userId === user?.id).length;
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [missions, setMissions] = useState<FirestoreMission[]>([]);
+  const [temp, setTemp] = useState<number | null>(null);
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    onRefresh?.();
+    // Animation de rotation brève (le contenu, lui, se recharge immédiatement)
+    setTimeout(() => setIsRefreshing(false), 700);
+  };
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -24,7 +34,61 @@ export function TopBar({ title }: TopBarProps) {
     return () => clearInterval(timer);
   }, []);
 
-  const notifications = mockNotifications.filter(n => n.userId === user?.id).slice(0, 5);
+  // Notifications réelles : dérivées des missions Firestore (temps réel).
+  useEffect(() => {
+    const unsubscribe = FirestoreMissionService.allMissionsListener(setMissions);
+    return () => unsubscribe();
+  }, []);
+
+  // Météo réelle de Niamey via open-meteo (API gratuite, sans clé).
+  useEffect(() => {
+    let active = true;
+    const fetchTemp = async () => {
+      try {
+        const res = await fetch(
+          'https://api.open-meteo.com/v1/forecast?latitude=13.5137&longitude=2.1098&current=temperature_2m'
+        );
+        const data = await res.json();
+        if (active && typeof data?.current?.temperature_2m === 'number') {
+          setTemp(Math.round(data.current.temperature_2m));
+        }
+      } catch {
+        /* silencieux : on conserve l'affichage de repli */
+      }
+    };
+    fetchTemp();
+    const id = setInterval(fetchTemp, 10 * 60 * 1000); // rafraîchir toutes les 10 min
+    return () => {
+      active = false;
+      clearInterval(id);
+    };
+  }, []);
+
+  // Construire les notifications à partir des 5 missions les plus récentes.
+  const notifications = [...missions]
+    .sort((a, b) => (b.updatedAt?.toMillis?.() || 0) - (a.updatedAt?.toMillis?.() || 0))
+    .slice(0, 5)
+    .map((m) => {
+      const status = m.status as string;
+      return {
+        id: m.id,
+        title:
+          status === 'terminée'
+            ? 'Mission terminée'
+            : status === 'annulée'
+              ? 'Mission annulée'
+              : status === 'en_attente'
+                ? 'Nouvelle mission'
+                : 'Mission mise à jour',
+        message: `${m.title || 'Mission'} → ${m.location || 'N/A'}`,
+        type:
+          status === 'terminée' ? 'success' : status === 'annulée' ? 'error' : 'info',
+        time: m.updatedAt?.toDate?.() || m.createdAt?.toDate?.() || new Date(),
+        isRead: status !== 'en_attente',
+      };
+    });
+  // Badge : missions en attente d'acceptation par un chauffeur.
+  const unreadCount = missions.filter((m) => (m.status as string) === 'en_attente').length;
 
   return (
     <motion.header
@@ -48,7 +112,7 @@ export function TopBar({ title }: TopBarProps) {
         </div>
         <div className="flex items-center gap-2 text-text-secondary">
           <Sun className="w-4 h-4 text-accent-orange" />
-          <span className="text-sm">32°C</span>
+          <span className="text-sm">{temp !== null ? `${temp}°C` : '--°C'}</span>
         </div>
         <div className="px-3 py-1.5 bg-background-secondary rounded-lg border border-border">
           <span className="text-sm font-mono text-accent-cyan">
@@ -57,8 +121,36 @@ export function TopBar({ title }: TopBarProps) {
         </div>
       </div>
 
-      {/* Right: Theme Toggle, Notifications & User */}
+      {/* Right: Refresh, Theme Toggle, Notifications & User */}
       <div className="flex items-center gap-4">
+        {/* Refresh — actualise la section affichée */}
+        <div className="relative group">
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={handleRefresh}
+            aria-label="Actualiser cette page"
+            className="w-10 h-10 rounded-xl flex items-center justify-center border border-border hover:border-accent-cyan/30 hover:bg-accent-cyan/5 transition-all duration-300"
+          >
+            <motion.span
+              animate={{ rotate: isRefreshing ? 360 : 0 }}
+              transition={
+                isRefreshing
+                  ? { duration: 0.7, repeat: Infinity, ease: 'linear' }
+                  : { duration: 0.2 }
+              }
+              className="flex items-center justify-center"
+            >
+              <RefreshCw className="w-5 h-5 text-text-secondary" strokeWidth={1.5} />
+            </motion.span>
+          </motion.button>
+
+          {/* Tooltip au survol */}
+          <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2.5 py-1 rounded-md bg-background-secondary border border-border text-xs text-text-primary whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 shadow-lg z-50">
+            Actualiser cette page
+          </span>
+        </div>
+
         {/* Theme Toggle */}
         <motion.button
           whileHover={{ scale: 1.05 }}
@@ -133,7 +225,7 @@ export function TopBar({ title }: TopBarProps) {
                             {notification.message}
                           </p>
                           <p className="text-[10px] text-text-secondary/60 mt-1">
-                            {new Date(notification.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                            {notification.time.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                           </p>
                         </div>
                       </div>

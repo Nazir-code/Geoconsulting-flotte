@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Route, RefreshCw, Satellite, List } from 'lucide-react';
+import { Route, RefreshCw, Satellite, List, Search } from 'lucide-react';
 import { MissionCard } from './MissionCard';
+import { MissionDetailsModal } from './MissionDetailsModal';
 import { CreateMissionForm } from './CreateMissionForm';
 import { CreateMissionFirebaseForm } from './CreateMissionFirebaseForm';
 import { LiveTrackingView } from './LiveTrackingView';
@@ -121,6 +122,8 @@ export function MissionsView() {
   const toast = useToast();
   const [rawMissions, setRawMissions] = useState<FirestoreMission[]>([]);
   const [filter, setFilter] = useState<FilterStatus>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [detailsMission, setDetailsMission] = useState<Mission | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<ActiveTab>('missions');
   const [allDrivers, setAllDrivers] = useState<Driver[]>([]);
@@ -202,9 +205,22 @@ export function MissionsView() {
     );
   }, [missions]);
 
-  const filteredMissions = missions.filter(mission =>
-    filter === 'all' || mission.status === filter
-  );
+  const filteredMissions = missions.filter((mission) => {
+    if (filter !== 'all' && mission.status !== filter) return false;
+
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return true;
+
+    const driverName =
+      `${mission.driver.user.firstName} ${mission.driver.user.lastName}`.toLowerCase();
+    return (
+      mission.destination.toLowerCase().includes(q) ||
+      (mission.startLocation || '').toLowerCase().includes(q) ||
+      mission.purpose.toLowerCase().includes(q) ||
+      driverName.includes(q) ||
+      mission.vehicle.plateNumber.toLowerCase().includes(q)
+    );
+  });
 
   const handleComplete = async (id: string) => {
     try {
@@ -224,6 +240,21 @@ export function MissionsView() {
     } catch (error) {
       console.error('Error cancelling mission:', error);
       toast.error('Échec', "Impossible d'annuler la mission.");
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    const ok = window.confirm(
+      'Supprimer définitivement cette mission ? Cette action est irréversible.'
+    );
+    if (!ok) return;
+    try {
+      await FirestoreMissionService.deleteMission(id);
+      // Le state se met à jour via le listener temps réel.
+      toast.success('Mission supprimée', 'La mission a été supprimée définitivement.');
+    } catch (error) {
+      console.error('Error deleting mission:', error);
+      toast.error('Échec', 'Impossible de supprimer la mission.');
     }
   };
 
@@ -359,6 +390,18 @@ export function MissionsView() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Mission List */}
               <div className="lg:col-span-2 space-y-4">
+                {/* Barre de recherche */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
+                  <input
+                    type="text"
+                    placeholder="Rechercher (destination, chauffeur, véhicule, objet…)"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="input-field input-with-icon w-full"
+                  />
+                </div>
+
                 {/* Filter Tabs */}
                 <div className="flex flex-wrap items-center gap-2">
                   {filterButtons.map((btn) => (
@@ -397,16 +440,26 @@ export function MissionsView() {
                         index={index}
                         onComplete={handleComplete}
                         onCancel={handleCancel}
+                        onDelete={handleDelete}
+                        onDetails={setDetailsMission}
                       />
                     ))
                   ) : (
                     <EmptyState
                       icon={Route}
-                      title={filter === 'all' ? 'Aucune mission' : 'Aucune mission pour ce filtre'}
+                      title={
+                        searchQuery
+                          ? 'Aucune mission correspondante'
+                          : filter === 'all'
+                            ? 'Aucune mission'
+                            : 'Aucune mission pour ce filtre'
+                      }
                       description={
-                        filter === 'all'
-                          ? 'Créez une mission pour la voir apparaître ici en temps réel.'
-                          : 'Essayez un autre filtre ou créez une nouvelle mission.'
+                        searchQuery
+                          ? 'Essayez un autre terme de recherche.'
+                          : filter === 'all'
+                            ? 'Créez une mission pour la voir apparaître ici en temps réel.'
+                            : 'Essayez un autre filtre ou créez une nouvelle mission.'
                       }
                     />
                   )}
@@ -439,6 +492,16 @@ export function MissionsView() {
           >
             <CreateMissionFirebaseForm />
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Modale détails mission */}
+      <AnimatePresence>
+        {detailsMission && (
+          <MissionDetailsModal
+            mission={detailsMission}
+            onClose={() => setDetailsMission(null)}
+          />
         )}
       </AnimatePresence>
     </motion.div>
