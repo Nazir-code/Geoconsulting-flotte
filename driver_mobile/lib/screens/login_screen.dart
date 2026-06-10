@@ -156,10 +156,18 @@ class _LoginScreenState extends State<LoginScreen>
             borderRadius: AppSpacing.roundedXl,
             boxShadow: AppTheme.shadowColored(AppColors.primary),
           ),
-          child: const Icon(
-            Icons.local_shipping_rounded,
-            color: Colors.white,
-            size: 40,
+          child: Center(
+            child: Image.asset(
+              'assets/images/logo_geoconsulting.png',
+              width: 40,
+              height: 40,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) => const Icon(
+                Icons.local_shipping_rounded,
+                color: Colors.white,
+                size: 40,
+              ),
+            ),
           ),
         ),
         const SizedBox(height: 24),

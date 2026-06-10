@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-
 import '../main.dart' show AuthWrapper;
 import '../theme/app_colors.dart';
 
@@ -33,7 +32,7 @@ class _SplashScreenState extends State<SplashScreen>
 
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 2400),
     );
 
     _fadeAnimation = CurvedAnimation(
