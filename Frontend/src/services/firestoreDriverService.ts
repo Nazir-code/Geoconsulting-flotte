@@ -14,6 +14,7 @@ export interface Driver {
   status: 'online' | 'offline';
   latitude?: number;
   longitude?: number;
+  heading?: number;
   lastLocationUpdate?: Timestamp;
   lastSeen: Timestamp;
   currentMission?: string;

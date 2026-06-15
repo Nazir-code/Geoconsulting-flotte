@@ -69,7 +69,7 @@ export function LiveTrackingView({ missions }: LiveTrackingViewProps) {
             lat: d.latitude!,
             lng: d.longitude!,
             speed: (d as unknown as { speed?: number }).speed || 0,
-            heading: (d as unknown as { heading?: number }).heading || 0,
+            heading: d.heading || 0,
             progress: (d as unknown as { progress?: number }).progress || 0,
             distanceDone: 0,
             distanceTotal: 0,
