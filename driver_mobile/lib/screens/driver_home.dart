@@ -17,6 +17,8 @@ import '../widgets/vehicle_status_card.dart';
 import '../widgets/quick_action_button.dart';
 import '../widgets/mission_card_pro.dart';
 import 'tracking_screen.dart';
+import 'fuel_entry_screen.dart';
+import 'maintenance_request_screen.dart';
 import '../theme/app_theme.dart';
 
 class DriverHome extends StatefulWidget {
@@ -47,12 +49,36 @@ class _DriverHomeState extends State<DriverHome> {
   final Set<String> _knownMissionIds = {};
   bool _isFirstMissionSnapshot = true;
 
+  // Créé après le premier rendu (addPostFrameCallback) pour garantir que
+  // le token Firestore est prêt. Caché pour éviter les annulations répétées
+  // dues aux setState GPS/boussole fréquents.
+  Stream<QuerySnapshot>? _recentMissionsStream;
+  bool _missionsTimedOut = false;
+  Timer? _missionsTimeoutTimer;
+
   @override
   void initState() {
     super.initState();
     _loadProfile();
     _startMissionNotifications();
     _initMissionListener();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _recentMissionsStream != null) return;
+      final uid = _authService.currentUid;
+      if (uid == null) return;
+      setState(() {
+        _recentMissionsStream = FirebaseFirestore.instance
+            .collection('missions')
+            .where('assignedTo', isEqualTo: uid)
+            .orderBy('createdAt', descending: true)
+            .limit(3)
+            .snapshots();
+      });
+      _missionsTimeoutTimer = Timer(const Duration(seconds: 6), () {
+        if (mounted) setState(() => _missionsTimedOut = true);
+      });
+    });
 
     GpsLifecycleManager().onPermissionDenied = () {
       if (!mounted) return;
@@ -67,6 +93,9 @@ class _DriverHomeState extends State<DriverHome> {
     _gpsSubscription = NewLocationService().positionStream.listen((pos) {
       if (mounted) {
         setState(() => _currentLocation = LatLng(pos.latitude, pos.longitude));
+        if (pos.speed > 0.5 && pos.heading >= 0) {
+          _applyCompassHeading(pos.heading);
+        }
       }
     });
 
@@ -85,6 +114,7 @@ class _DriverHomeState extends State<DriverHome> {
   void dispose() {
     _gpsSubscription?.cancel();
     _compassSubscription?.cancel();
+    _missionsTimeoutTimer?.cancel();
     GpsLifecycleManager().onPermissionDenied = null;
     _missionSubscription?.cancel();
     super.dispose();
@@ -115,6 +145,7 @@ class _DriverHomeState extends State<DriverHome> {
       });
     }
   }
+
 
   void _initMissionListener() {
     final uid = _authService.currentUid;
@@ -333,16 +364,26 @@ class _DriverHomeState extends State<DriverHome> {
               ),
             ),
             QuickActionButton(
-              icon: Icons.history_rounded,
-              label: "Historique",
+              icon: Icons.local_gas_station_rounded,
+              label: "Carburant",
               color: const Color(0xFF8B5CF6),
-              onTap: () {},
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => FuelEntryScreen(driverName: _profile?.name),
+                ),
+              ),
             ),
             QuickActionButton(
-              icon: Icons.qr_code_scanner_rounded,
-              label: "Scanner",
+              icon: Icons.build_rounded,
+              label: "Entretien",
               color: AppColors.warning,
-              onTap: () {},
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => MaintenanceRequestScreen(driverName: _profile?.name),
+                ),
+              ),
             ),
           ],
         ),
@@ -501,14 +542,76 @@ class _DriverHomeState extends State<DriverHome> {
   }
 
   Widget _buildRecentMissionsList() {
+    if (_recentMissionsStream == null) {
+      return const SliverToBoxAdapter(
+        child: Padding(
+          padding: EdgeInsets.all(20),
+          child: Center(
+            child: CircularProgressIndicator(
+              color: AppColors.primary,
+              strokeWidth: 2,
+            ),
+          ),
+        ),
+      );
+    }
+
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('missions')
-          .where('assignedTo', isEqualTo: _authService.currentUid)
-          .limit(3)
-          .snapshots(),
+      stream: _recentMissionsStream,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        if (!snapshot.hasData && !snapshot.hasError) {
+          if (_missionsTimedOut) {
+            return SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                child: Column(
+                  children: [
+                    const Icon(Icons.wifi_off_rounded,
+                        color: AppColors.textSecondary, size: 32),
+                    const SizedBox(height: 10),
+                    Text('Connexion Firestore indisponible',
+                        style: AppTextStyles.bodySm, textAlign: TextAlign.center),
+                    const SizedBox(height: 12),
+                    GestureDetector(
+                      onTap: () => setState(() {
+                        _missionsTimedOut = false;
+                        _recentMissionsStream = null;
+                        _missionsTimeoutTimer?.cancel();
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (!mounted) return;
+                          final uid = _authService.currentUid;
+                          if (uid == null) return;
+                          setState(() {
+                            _recentMissionsStream = FirebaseFirestore.instance
+                                .collection('missions')
+                                .where('assignedTo', isEqualTo: uid)
+                                .orderBy('createdAt', descending: true)
+                                .limit(3)
+                                .snapshots();
+                          });
+                          _missionsTimeoutTimer =
+                              Timer(const Duration(seconds: 6), () {
+                            if (mounted) setState(() => _missionsTimedOut = true);
+                          });
+                        });
+                      }),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryLight,
+                          borderRadius: AppSpacing.roundedFull,
+                        ),
+                        child: Text('Réessayer',
+                            style: AppTextStyles.label
+                                .copyWith(color: AppColors.primary)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
           return const SliverToBoxAdapter(
             child: Padding(
               padding: EdgeInsets.all(20),
@@ -522,10 +625,23 @@ class _DriverHomeState extends State<DriverHome> {
           );
         }
 
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+        // Données reçues — annule le timeout
+        if (snapshot.hasData) _missionsTimeoutTimer?.cancel();
+
+        if (snapshot.hasError) {
           return SliverToBoxAdapter(
-            child: _buildEmptyMissions(),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              child: Text(
+                'Erreur de chargement : ${snapshot.error}',
+                style: const TextStyle(color: AppColors.error),
+              ),
+            ),
           );
+        }
+
+        if (snapshot.data!.docs.isEmpty) {
+          return SliverToBoxAdapter(child: _buildEmptyMissions());
         }
 
         return SliverPadding(
