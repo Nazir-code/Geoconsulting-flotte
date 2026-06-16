@@ -49,12 +49,11 @@ class _DriverHomeState extends State<DriverHome> {
   final Set<String> _knownMissionIds = {};
   bool _isFirstMissionSnapshot = true;
 
-  // Créé après le premier rendu (addPostFrameCallback) pour garantir que
-  // le token Firestore est prêt. Caché pour éviter les annulations répétées
-  // dues aux setState GPS/boussole fréquents.
+  // Stream des missions récentes, créé une seule fois et caché pour éviter
+  // les re-souscriptions à chaque setState GPS/boussole. Initialisé en lazy
+  // via _ensureMissionsStream() dès que l'uid est disponible (robuste au
+  // démarrage où l'auth peut ne pas être encore restaurée au 1er frame).
   Stream<QuerySnapshot>? _recentMissionsStream;
-  bool _missionsTimedOut = false;
-  Timer? _missionsTimeoutTimer;
 
   @override
   void initState() {
@@ -62,23 +61,7 @@ class _DriverHomeState extends State<DriverHome> {
     _loadProfile();
     _startMissionNotifications();
     _initMissionListener();
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _recentMissionsStream != null) return;
-      final uid = _authService.currentUid;
-      if (uid == null) return;
-      setState(() {
-        _recentMissionsStream = FirebaseFirestore.instance
-            .collection('missions')
-            .where('assignedTo', isEqualTo: uid)
-            .orderBy('createdAt', descending: true)
-            .limit(3)
-            .snapshots();
-      });
-      _missionsTimeoutTimer = Timer(const Duration(seconds: 6), () {
-        if (mounted) setState(() => _missionsTimedOut = true);
-      });
-    });
+    _ensureMissionsStream(); // init au plus tôt ; fallback lazy dans build()
 
     GpsLifecycleManager().onPermissionDenied = () {
       if (!mounted) return;
@@ -114,7 +97,6 @@ class _DriverHomeState extends State<DriverHome> {
   void dispose() {
     _gpsSubscription?.cancel();
     _compassSubscription?.cancel();
-    _missionsTimeoutTimer?.cancel();
     GpsLifecycleManager().onPermissionDenied = null;
     _missionSubscription?.cancel();
     super.dispose();
@@ -541,8 +523,26 @@ class _DriverHomeState extends State<DriverHome> {
     );
   }
 
+  // Crée le stream des missions une seule fois, dès que l'uid est disponible.
+  // Idempotent : appelé à chaque build, il réessaie tant que l'uid est null
+  // (les rebuilds GPS ~1×/s garantissent la création dès que l'auth est prête).
+  // Requête simple (where assignedTo) sans orderBy → aucun index composite
+  // requis ; le tri "récent" se fait côté client.
+  void _ensureMissionsStream() {
+    if (_recentMissionsStream != null) return;
+    final uid = _authService.currentUid;
+    if (uid == null) return;
+    _recentMissionsStream = FirebaseFirestore.instance
+        .collection('missions')
+        .where('assignedTo', isEqualTo: uid)
+        .snapshots();
+  }
+
   Widget _buildRecentMissionsList() {
+    _ensureMissionsStream();
+
     if (_recentMissionsStream == null) {
+      // uid pas encore prêt — spinner transitoire, le prochain rebuild réessaie
       return const SliverToBoxAdapter(
         child: Padding(
           padding: EdgeInsets.all(20),
@@ -559,59 +559,19 @@ class _DriverHomeState extends State<DriverHome> {
     return StreamBuilder<QuerySnapshot>(
       stream: _recentMissionsStream,
       builder: (context, snapshot) {
-        if (!snapshot.hasData && !snapshot.hasError) {
-          if (_missionsTimedOut) {
-            return SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                child: Column(
-                  children: [
-                    const Icon(Icons.wifi_off_rounded,
-                        color: AppColors.textSecondary, size: 32),
-                    const SizedBox(height: 10),
-                    Text('Connexion Firestore indisponible',
-                        style: AppTextStyles.bodySm, textAlign: TextAlign.center),
-                    const SizedBox(height: 12),
-                    GestureDetector(
-                      onTap: () => setState(() {
-                        _missionsTimedOut = false;
-                        _recentMissionsStream = null;
-                        _missionsTimeoutTimer?.cancel();
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          if (!mounted) return;
-                          final uid = _authService.currentUid;
-                          if (uid == null) return;
-                          setState(() {
-                            _recentMissionsStream = FirebaseFirestore.instance
-                                .collection('missions')
-                                .where('assignedTo', isEqualTo: uid)
-                                .orderBy('createdAt', descending: true)
-                                .limit(3)
-                                .snapshots();
-                          });
-                          _missionsTimeoutTimer =
-                              Timer(const Duration(seconds: 6), () {
-                            if (mounted) setState(() => _missionsTimedOut = true);
-                          });
-                        });
-                      }),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 20, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: AppColors.primaryLight,
-                          borderRadius: AppSpacing.roundedFull,
-                        ),
-                        child: Text('Réessayer',
-                            style: AppTextStyles.label
-                                .copyWith(color: AppColors.primary)),
-                      ),
-                    ),
-                  ],
-                ),
+        if (snapshot.hasError) {
+          return SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              child: Text(
+                'Erreur de chargement : ${snapshot.error}',
+                style: const TextStyle(color: AppColors.error),
               ),
-            );
-          }
+            ),
+          );
+        }
+
+        if (!snapshot.hasData) {
           return const SliverToBoxAdapter(
             child: Padding(
               padding: EdgeInsets.all(20),
@@ -625,22 +585,21 @@ class _DriverHomeState extends State<DriverHome> {
           );
         }
 
-        // Données reçues — annule le timeout
-        if (snapshot.hasData) _missionsTimeoutTimer?.cancel();
+        // Tri côté client par createdAt décroissant, puis 3 plus récentes.
+        // Gère les docs sans createdAt (placés en fin) — évite l'exclusion
+        // silencieuse qu'aurait provoquée un orderBy('createdAt') serveur.
+        final docs = snapshot.data!.docs.toList()
+          ..sort((a, b) {
+            final ta = (a.data() as Map<String, dynamic>)['createdAt'];
+            final tb = (b.data() as Map<String, dynamic>)['createdAt'];
+            if (ta is Timestamp && tb is Timestamp) return tb.compareTo(ta);
+            if (ta is Timestamp) return -1;
+            if (tb is Timestamp) return 1;
+            return 0;
+          });
+        final recent = docs.take(3).toList();
 
-        if (snapshot.hasError) {
-          return SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              child: Text(
-                'Erreur de chargement : ${snapshot.error}',
-                style: const TextStyle(color: AppColors.error),
-              ),
-            ),
-          );
-        }
-
-        if (snapshot.data!.docs.isEmpty) {
+        if (recent.isEmpty) {
           return SliverToBoxAdapter(child: _buildEmptyMissions());
         }
 
@@ -649,14 +608,14 @@ class _DriverHomeState extends State<DriverHome> {
           sliver: SliverList(
             delegate: SliverChildBuilderDelegate(
               (context, index) {
-                final doc = snapshot.data!.docs[index];
+                final doc = recent[index];
                 final data = {
                   'id': doc.id,
                   ...(doc.data() as Map<String, dynamic>),
                 };
                 return MissionCardPro(mission: data);
               },
-              childCount: snapshot.data!.docs.length,
+              childCount: recent.length,
             ),
           ),
         );
