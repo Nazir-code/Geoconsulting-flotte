@@ -31,7 +31,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     _Notif(
       id: '3',
       title: 'Alerte Météo',
-      body: 'Vents de sable signalés sur l\'axe Niamey-Tahoua. Prudence recommandée.',
+      body: 'Vents de sable salés sur l\'axe Niamey-Tahoua. Prudence recommandée.',
       type: _NotifType.info,
       time: 'Hier',
       isRead: true,

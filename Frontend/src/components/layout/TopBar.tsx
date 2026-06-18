@@ -5,6 +5,8 @@ import { useTheme } from '@/context/ThemeContext';
 import { formatTime } from '@/lib/utils';
 import { useState, useEffect } from 'react';
 import { FirestoreMissionService, type Mission as FirestoreMission } from '@/services/firestoreMissionService';
+import { FirestoreFuelService, type FuelRecord } from '@/services/firestoreFuelService';
+import { FirestoreMaintenanceService, type MaintenanceRequest } from '@/services/firestoreMaintenanceService';
 
 interface TopBarProps {
   title: string;
@@ -18,6 +20,8 @@ export function TopBar({ title, onRefresh }: TopBarProps) {
   const [showNotifications, setShowNotifications] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [missions, setMissions] = useState<FirestoreMission[]>([]);
+  const [fuelRecords, setFuelRecords] = useState<FuelRecord[]>([]);
+  const [maintRequests, setMaintRequests] = useState<MaintenanceRequest[]>([]);
   const [temp, setTemp] = useState<number | null>(null);
 
   const handleRefresh = () => {
@@ -34,10 +38,16 @@ export function TopBar({ title, onRefresh }: TopBarProps) {
     return () => clearInterval(timer);
   }, []);
 
-  // Notifications réelles : dérivées des missions Firestore (temps réel).
+  // Notifications réelles : missions + pleins + demandes d'entretien (temps réel).
   useEffect(() => {
-    const unsubscribe = FirestoreMissionService.allMissionsListener(setMissions);
-    return () => unsubscribe();
+    const unsubMissions = FirestoreMissionService.allMissionsListener(setMissions);
+    const unsubFuel = FirestoreFuelService.allFuelRecordsListener(setFuelRecords);
+    const unsubMaint = FirestoreMaintenanceService.allRequestsListener(setMaintRequests);
+    return () => {
+      unsubMissions();
+      unsubFuel();
+      unsubMaint();
+    };
   }, []);
 
   // Météo réelle de Niamey via open-meteo (API gratuite, sans clé).
@@ -64,31 +74,54 @@ export function TopBar({ title, onRefresh }: TopBarProps) {
     };
   }, []);
 
-  // Construire les notifications à partir des 5 missions les plus récentes.
-  const notifications = [...missions]
-    .sort((a, b) => (b.updatedAt?.toMillis?.() || 0) - (a.updatedAt?.toMillis?.() || 0))
-    .slice(0, 5)
-    .map((m) => {
-      const status = m.status as string;
-      return {
-        id: m.id,
-        title:
-          status === 'terminée'
-            ? 'Mission terminée'
-            : status === 'annulée'
-              ? 'Mission annulée'
-              : status === 'en_attente'
-                ? 'Nouvelle mission'
-                : 'Mission mise à jour',
-        message: `${m.title || 'Mission'} → ${m.location || 'N/A'}`,
-        type:
-          status === 'terminée' ? 'success' : status === 'annulée' ? 'error' : 'info',
-        time: m.updatedAt?.toDate?.() || m.createdAt?.toDate?.() || new Date(),
-        isRead: status !== 'en_attente',
-      };
-    });
-  // Badge : missions en attente d'acceptation par un chauffeur.
-  const unreadCount = missions.filter((m) => (m.status as string) === 'en_attente').length;
+  // Notifications unifiées : missions + pleins + demandes d'entretien.
+  type Notif = { id: string; title: string; message: string; type: string; time: Date; isRead: boolean };
+
+  const missionNotifs: Notif[] = missions.map((m) => {
+    const status = m.status as string;
+    return {
+      id: `mission-${m.id}`,
+      title:
+        status === 'terminée'
+          ? 'Mission terminée'
+          : status === 'annulée'
+            ? 'Mission annulée'
+            : status === 'en_attente'
+              ? 'Nouvelle mission'
+              : 'Mission mise à jour',
+      message: `${m.title || 'Mission'} → ${m.location || 'N/A'}`,
+      type: status === 'terminée' ? 'success' : status === 'annulée' ? 'error' : 'info',
+      time: m.updatedAt?.toDate?.() || m.createdAt?.toDate?.() || new Date(),
+      isRead: status !== 'en_attente',
+    };
+  });
+
+  const fuelNotifs: Notif[] = fuelRecords.map((r) => ({
+    id: `fuel-${r.id}`,
+    title: 'Plein de carburant',
+    message: `${r.driverName || 'Chauffeur'} · ${r.vehiclePlate} (${r.quantity} L)`,
+    type: 'success',
+    time: new Date(r.createdAt || r.date),
+    isRead: true,
+  }));
+
+  const maintNotifs: Notif[] = maintRequests.map((q) => ({
+    id: `maint-${q.id}`,
+    title: "Demande d'entretien",
+    message: `${q.vehiclePlate} · ${q.type}`,
+    type: q.status === 'resolved' ? 'success' : 'warning',
+    time: new Date(q.createdAt || q.date),
+    isRead: q.status === 'resolved',
+  }));
+
+  const notifications = [...missionNotifs, ...fuelNotifs, ...maintNotifs]
+    .sort((a, b) => b.time.getTime() - a.time.getTime())
+    .slice(0, 8);
+
+  // Badge : missions en attente + demandes d'entretien ouvertes.
+  const unreadCount =
+    missions.filter((m) => (m.status as string) === 'en_attente').length +
+    maintRequests.filter((q) => q.status === 'requested').length;
 
   return (
     <motion.header

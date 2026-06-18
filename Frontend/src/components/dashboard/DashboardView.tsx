@@ -13,6 +13,7 @@ import { FirestoreDriverService } from '@/services/firestoreDriverService';
 import { FirestoreMissionService } from '@/services/firestoreMissionService';
 import { FirestoreVehicleService } from '@/services/firestoreVehicleService';
 import { FirestoreFuelService } from '@/services/firestoreFuelService';
+import { FirestoreMaintenanceService } from '@/services/firestoreMaintenanceService';
 import type { DashboardStats, ActivityItem, Mission } from '@/types';
 
 export function DashboardView() {
@@ -31,17 +32,16 @@ export function DashboardView() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // 1. Véhicules en temps réel → total + alertes (véhicules en maintenance / indisponibles)
+    // 1. Véhicules en temps réel → total
     const unsubscribeVehicles = FirestoreVehicleService.allVehiclesListener((vehicles) => {
-      const needAttention = vehicles.filter(
-        (v) => v.status === 'maintenance' || v.status === 'unavailable'
-      ).length;
-      setStats((prev) => ({
-        ...prev,
-        totalVehicles: vehicles.length,
-        maintenanceAlerts: needAttention,
-      }));
+      setStats((prev) => ({ ...prev, totalVehicles: vehicles.length }));
       setIsLoading(false);
+    });
+
+    // 1bis. Demandes d'entretien ouvertes → alertes (signalées par les chauffeurs)
+    const unsubscribeMaint = FirestoreMaintenanceService.allRequestsListener((requests) => {
+      const open = requests.filter((r) => r.status === 'requested').length;
+      setStats((prev) => ({ ...prev, maintenanceAlerts: open }));
     });
 
     // 2. Coût carburant du mois en cours (réel, depuis fuel_records)
@@ -105,6 +105,7 @@ export function DashboardView() {
 
     return () => {
       unsubscribeVehicles();
+      unsubscribeMaint();
       unsubscribeFuel();
       unsubscribeDrivers();
       unsubscribeMissions();
