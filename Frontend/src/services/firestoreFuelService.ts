@@ -16,6 +16,8 @@ export interface FuelRecord {
   totalCost: number; // FCFA
   station?: string;
   mileage?: number; // km au moment du plein
+  driverId?: string; // chauffeur ayant saisi (mobile)
+  driverName?: string;
   createdAt: string;
 }
 

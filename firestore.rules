@@ -64,8 +64,23 @@ service cloud.firestore {
       // Lecture pour tout utilisateur authentifié (web + mobile)
       allow read: if isAuthenticated();
 
-      // Création / modification / suppression réservées aux managers
-      allow create, update, delete: if isAuthenticated() && isManager();
+      // Saisie par le chauffeur (mobile) OU le manager (web)
+      allow create: if isAuthenticated();
+
+      // Modification / suppression réservées aux managers
+      allow update, delete: if isAuthenticated() && isManager();
+    }
+
+    // Collection: maintenance_requests (demandes d'entretien signalées par le chauffeur)
+    match /maintenance_requests/{requestId} {
+      // Lecture pour tout utilisateur authentifié (web + mobile)
+      allow read: if isAuthenticated();
+
+      // Le chauffeur (mobile) peut créer une demande d'entretien
+      allow create: if isAuthenticated();
+
+      // Résolution / suppression réservées aux managers
+      allow update, delete: if isAuthenticated() && isManager();
     }
 
     // Sécurité par défaut : Refuser tout le reste

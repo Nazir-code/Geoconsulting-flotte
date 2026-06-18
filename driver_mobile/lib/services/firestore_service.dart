@@ -58,6 +58,69 @@ class FirestoreService {
     }
   }
 
+  /// Récupère la liste des véhicules (pour les listes déroulantes mobile).
+  Future<List<Map<String, dynamic>>> getVehicles() async {
+    try {
+      final snapshot = await _db.collection('vehicles').get();
+      return snapshot.docs
+          .map((doc) => {'id': doc.id, ...doc.data()})
+          .toList();
+    } catch (e) {
+      print("Erreur Firestore Get Vehicles: $e");
+      return [];
+    }
+  }
+
+  /// Enregistre un plein de carburant (saisi par le chauffeur).
+  Future<void> addFuelRecord({
+    required String vehicleId,
+    required String vehiclePlate,
+    required double quantity,
+    required double pricePerLiter,
+    String? station,
+    double? mileage,
+    String? driverId,
+    String? driverName,
+  }) async {
+    await _db.collection('fuel_records').add({
+      'vehicleId': vehicleId,
+      'vehiclePlate': vehiclePlate,
+      'date': DateTime.now().toIso8601String(),
+      'quantity': quantity,
+      'pricePerLiter': pricePerLiter,
+      'totalCost': quantity * pricePerLiter,
+      if (station != null && station.isNotEmpty) 'station': station,
+      if (mileage != null) 'mileage': mileage,
+      if (driverId != null) 'driverId': driverId,
+      if (driverName != null) 'driverName': driverName,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// Enregistre une demande d'entretien (signalée par le chauffeur).
+  Future<void> addMaintenanceRequest({
+    required String vehicleId,
+    required String vehiclePlate,
+    required String type,
+    required String description,
+    double? mileage,
+    String? driverId,
+    String? driverName,
+  }) async {
+    await _db.collection('maintenance_requests').add({
+      'vehicleId': vehicleId,
+      'vehiclePlate': vehiclePlate,
+      'type': type,
+      'description': description,
+      if (mileage != null) 'mileage': mileage,
+      if (driverId != null) 'driverId': driverId,
+      if (driverName != null) 'driverName': driverName,
+      'status': 'requested',
+      'date': DateTime.now().toIso8601String(),
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
+
   /// Met à jour le statut du chauffeur (online / offline).
   Future<void> updateStatus({
     required String uid,
