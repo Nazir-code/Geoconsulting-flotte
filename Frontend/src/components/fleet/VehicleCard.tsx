@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Car, Gauge, Calendar, User, Edit, Trash2 } from 'lucide-react';
 import type { Vehicle } from '@/types';
 import { formatNumber } from '@/lib/utils';
+import { vehicleImageSrc } from '@/lib/vehicleImages';
 import { StatusChip } from '@/components/common';
 
 interface VehicleCardProps {
@@ -12,6 +14,11 @@ interface VehicleCardProps {
 }
 
 export function VehicleCard({ vehicle, index, onEdit, onDelete }: VehicleCardProps) {
+  // Photo custom du véhicule, sinon image par défaut selon le type.
+  // imgFailed → repli sur l'icône si l'URL ne charge pas (jamais d'image cassée).
+  const [imgFailed, setImgFailed] = useState(false);
+  const imageSrc = vehicleImageSrc(vehicle);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -22,11 +29,13 @@ export function VehicleCard({ vehicle, index, onEdit, onDelete }: VehicleCardPro
     >
       {/* Vehicle Image */}
       <div className="relative h-40 overflow-hidden">
-        {vehicle.image ? (
+        {!imgFailed ? (
           <img
-            src={vehicle.image}
+            src={imageSrc}
             alt={`${vehicle.brand} ${vehicle.model}`}
             className="w-full h-full object-cover"
+            loading="lazy"
+            onError={() => setImgFailed(true)}
           />
         ) : (
           <div className="w-full h-full bg-background-secondary flex items-center justify-center">

@@ -73,7 +73,19 @@ export function FleetView() {
     };
   }, []);
 
+  // Vérifie l'unicité de l'immatriculation (identifiant naturel du véhicule).
+  // Comparaison insensible à la casse/espaces, en excluant le véhicule édité.
+  const isPlateTaken = (plate: string, excludeId?: string) => {
+    const norm = (s: string) => s.replace(/\s+/g, '').toUpperCase();
+    const target = norm(plate);
+    return vehicles.some((v) => v.id !== excludeId && norm(v.plateNumber) === target);
+  };
+
   const handleCreateVehicle = async (data: Omit<Vehicle, 'id' | 'createdAt' | 'updatedAt'>) => {
+    if (isPlateTaken(data.plateNumber)) {
+      alert(`L'immatriculation « ${data.plateNumber} » existe déjà.`);
+      return;
+    }
     try {
       // Le listener temps réel mettra la liste à jour automatiquement.
       await FirestoreVehicleService.createVehicle(data);
@@ -87,6 +99,10 @@ export function FleetView() {
   const handleUpdateVehicle = async (data: Omit<Vehicle, 'id' | 'createdAt' | 'updatedAt'>) => {
     if (!editingVehicle) return;
 
+    if (isPlateTaken(data.plateNumber, editingVehicle.id)) {
+      alert(`L'immatriculation « ${data.plateNumber} » existe déjà.`);
+      return;
+    }
     try {
       await FirestoreVehicleService.updateVehicle(editingVehicle.id, data);
       setShowVehicleForm(false);
@@ -98,6 +114,7 @@ export function FleetView() {
   };
 
   const handleDeleteVehicle = async (id: string) => {
+    // La confirmation est gérée par VehicleCard avant d'appeler ce handler.
     try {
       await FirestoreVehicleService.deleteVehicle(id);
     } catch (error) {
