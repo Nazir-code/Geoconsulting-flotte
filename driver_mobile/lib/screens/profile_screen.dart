@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
+import '../services/theme_service.dart';
 import '../models/driver_profile.dart';
 import '../theme/app_theme.dart';
 import '../theme/app_transitions.dart';
@@ -38,7 +39,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.primary,
         surfaceTintColor: Colors.transparent,
@@ -97,6 +97,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   // ── Card profil (avatar + nom + badge statut) ─────────────────────────────
   Widget _buildProfileCard() {
+    final cs = Theme.of(context).colorScheme;
     return Transform.translate(
       offset: const Offset(0, 0),
       child: Padding(
@@ -104,9 +105,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: AppColors.surface,
+            color: cs.surface,
             borderRadius: AppSpacing.roundedXl,
-            border: Border.all(color: AppColors.borderLight),
+            border: Border.all(color: cs.outlineVariant),
             boxShadow: AppTheme.shadowMd,
           ),
           child: Row(
@@ -138,9 +139,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       width: 26,
                       height: 26,
                       decoration: BoxDecoration(
-                        color: AppColors.surface,
+                        color: cs.surface,
                         shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.borderLight),
+                        border: Border.all(color: cs.outlineVariant),
                       ),
                       child: const Icon(
                         Icons.edit_rounded,
@@ -184,6 +185,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   // ── Stats row ─────────────────────────────────────────────────────────────
   Widget _buildStatsRow() {
+    final cs = Theme.of(context).colorScheme;
     return Transform.translate(
       offset: const Offset(0, 0),
       child: Padding(
@@ -191,9 +193,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 16),
           decoration: BoxDecoration(
-            color: AppColors.surface,
+            color: cs.surface,
             borderRadius: AppSpacing.roundedLg,
-            border: Border.all(color: AppColors.borderLight),
+            border: Border.all(color: cs.outlineVariant),
             boxShadow: AppTheme.shadowSm,
           ),
           child: IntrinsicHeight(
@@ -254,11 +256,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   // ── Info Card ─────────────────────────────────────────────────────────────
   Widget _buildInfoCard() {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: cs.surface,
         borderRadius: AppSpacing.roundedLg,
-        border: Border.all(color: AppColors.borderLight),
+        border: Border.all(color: cs.outlineVariant),
         boxShadow: AppTheme.shadowSm,
       ),
       child: Column(
@@ -269,14 +272,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _profile?.driverId ?? "N/A",
             AppColors.primary,
           ),
-          const Divider(height: 1, color: AppColors.borderLight, indent: 56),
+          Divider(height: 1, color: cs.outlineVariant, indent: 56),
           _buildInfoRow(
             Icons.phone_outlined,
             "Téléphone",
             "+227 00 00 00 00",
             AppColors.success,
           ),
-          const Divider(height: 1, color: AppColors.borderLight, indent: 56),
+          Divider(height: 1, color: cs.outlineVariant, indent: 56),
           _buildInfoRow(
             Icons.email_outlined,
             "Email",
@@ -324,11 +327,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   // ── Settings Card ─────────────────────────────────────────────────────────
   Widget _buildSettingsCard() {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: cs.surface,
         borderRadius: AppSpacing.roundedLg,
-        border: Border.all(color: AppColors.borderLight),
+        border: Border.all(color: cs.outlineVariant),
         boxShadow: AppTheme.shadowSm,
       ),
       child: Column(
@@ -343,24 +347,87 @@ class _ProfileScreenState extends State<ProfileScreen> {
               onChanged: (v) => setState(() => _notificationsEnabled = v),
             ),
           ),
-          const Divider(height: 1, color: AppColors.borderLight, indent: 56),
+          Divider(height: 1, color: cs.outlineVariant, indent: 56),
+          _buildAppearanceTile(cs),
+          Divider(height: 1, color: cs.outlineVariant, indent: 56),
           _buildSettingsTile(
             icon: Icons.language_outlined,
             iconColor: AppColors.info,
             title: "Langue",
             trailingText: "Français",
           ),
-          const Divider(height: 1, color: AppColors.borderLight, indent: 56),
+          Divider(height: 1, color: cs.outlineVariant, indent: 56),
           _buildSettingsTile(
             icon: Icons.security_outlined,
             iconColor: AppColors.success,
             title: "Confidentialité",
           ),
-          const Divider(height: 1, color: AppColors.borderLight, indent: 56),
+          Divider(height: 1, color: cs.outlineVariant, indent: 56),
           _buildSettingsTile(
             icon: Icons.help_outline_rounded,
             iconColor: AppColors.primary,
             title: "Aide & Support",
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAppearanceTile(ColorScheme cs) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withValues(alpha: 0.1),
+                  borderRadius: AppSpacing.roundedSm,
+                ),
+                child: const Icon(Icons.brightness_6_outlined,
+                    size: 18, color: AppColors.accent),
+              ),
+              const SizedBox(width: 14),
+              Text("Apparence", style: AppTextStyles.h6),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ListenableBuilder(
+            listenable: ThemeService.instance,
+            builder: (_, __) => SegmentedButton<ThemeMode>(
+              segments: const [
+                ButtonSegment(
+                  value: ThemeMode.system,
+                  icon: Icon(Icons.brightness_auto_rounded, size: 15),
+                  label: Text('Auto'),
+                ),
+                ButtonSegment(
+                  value: ThemeMode.light,
+                  icon: Icon(Icons.light_mode_rounded, size: 15),
+                  label: Text('Clair'),
+                ),
+                ButtonSegment(
+                  value: ThemeMode.dark,
+                  icon: Icon(Icons.dark_mode_rounded, size: 15),
+                  label: Text('Sombre'),
+                ),
+              ],
+              selected: {ThemeService.instance.mode},
+              onSelectionChanged: (Set<ThemeMode> s) =>
+                  ThemeService.instance.setMode(s.first),
+              style: ButtonStyle(
+                textStyle: WidgetStateProperty.all(const TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                )),
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
           ),
         ],
       ),

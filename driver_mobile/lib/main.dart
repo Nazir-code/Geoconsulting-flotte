@@ -11,6 +11,7 @@ import 'screens/login_screen.dart';
 import 'services/auth_service.dart';
 import 'services/firebase_notification_service.dart';
 import 'services/gps_lifecycle_manager.dart';
+import 'services/theme_service.dart';
 import 'theme/app_theme.dart';
 
 @pragma('vm:entry-point')
@@ -44,7 +45,8 @@ Future<void> main() async {
   // Initialisation des données locales (français)
   await initializeDateFormatting('fr_FR', null);
   await FirebaseNotificationService.instance.initialize();
-  
+  await ThemeService.instance.load();
+
   runApp(const DriverMobileApp());
 }
 
@@ -53,19 +55,20 @@ class DriverMobileApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'FleetNexus - Driver',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.system,
-      // Écran initial : Splash animé → redirige ensuite vers AuthWrapper,
-      // qui décide accueil/connexion et démarre FCM + GPS.
-      home: const SplashScreen(),
-      routes: {
-        '/login': (_) => const LoginScreen(),
-        '/home': (_) => const MainNavigationScreen(),
-      },
+    return ListenableBuilder(
+      listenable: ThemeService.instance,
+      builder: (_, __) => MaterialApp(
+        title: 'FleetNexus - Driver',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.lightTheme,
+        darkTheme: AppTheme.darkTheme,
+        themeMode: ThemeService.instance.mode,
+        home: const SplashScreen(),
+        routes: {
+          '/login': (_) => const LoginScreen(),
+          '/home': (_) => const MainNavigationScreen(),
+        },
+      ),
     );
   }
 }

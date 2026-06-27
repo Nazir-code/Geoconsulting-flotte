@@ -46,7 +46,6 @@ class _MissionsScreenState extends State<MissionsScreen>
     final uid = _authService.currentUid;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text("Mes Missions"),
         actions: [

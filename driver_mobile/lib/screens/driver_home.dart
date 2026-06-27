@@ -223,7 +223,6 @@ class _DriverHomeState extends State<DriverHome> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
       body: SafeArea(
         child: DsShimmer(
           child: RefreshIndicator(
@@ -606,21 +605,22 @@ class _DriverHomeState extends State<DriverHome> {
   }
 
   Widget _buildEmptyMissions() {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 28),
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: cs.surface,
           borderRadius: AppSpacing.roundedLg,
-          border: Border.all(color: AppColors.borderLight),
+          border: Border.all(color: cs.outlineVariant),
         ),
         child: Column(
           children: [
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: AppColors.surfaceVariant,
+                color: cs.surfaceContainerHighest,
                 shape: BoxShape.circle,
               ),
               child: const Icon(

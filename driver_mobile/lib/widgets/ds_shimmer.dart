@@ -63,18 +63,19 @@ class DsShimmerBox extends StatelessWidget {
     this.radius = 8.0,
   });
 
-  static const Color _base = Color(0xFFEEF0F4);
-  static const Color _highlight = Color(0xFFF8FAFC);
-
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final base = isDark ? const Color(0xFF1E293B) : const Color(0xFFEEF0F4);
+    final highlight = isDark ? const Color(0xFF334155) : const Color(0xFFF8FAFC);
+
     final anim = _ShimmerScope.of(context);
     if (anim == null) {
       return Container(
         width: width,
         height: height,
         decoration: BoxDecoration(
-          color: _base,
+          color: base,
           borderRadius: BorderRadius.circular(radius),
         ),
       );
@@ -90,7 +91,7 @@ class DsShimmerBox extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment(-2.0 + t * 4.0, 0.0),
               end: Alignment(0.0 + t * 4.0, 0.0),
-              colors: const [_base, _highlight, _base],
+              colors: [base, highlight, base],
               stops: const [0.0, 0.5, 1.0],
             ),
             borderRadius: BorderRadius.circular(radius),
@@ -108,12 +109,13 @@ class MissionCardSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: cs.surface,
         borderRadius: AppSpacing.roundedLg,
-        border: Border.all(color: AppColors.borderLight),
+        border: Border.all(color: cs.outlineVariant),
         boxShadow: AppTheme.shadowSm,
       ),
       child: Column(
@@ -173,12 +175,13 @@ class KpiCardSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: cs.surface,
         borderRadius: AppSpacing.roundedLg,
-        border: Border.all(color: AppColors.borderLight),
+        border: Border.all(color: cs.outlineVariant),
         boxShadow: AppTheme.shadowSm,
       ),
       child: const Column(

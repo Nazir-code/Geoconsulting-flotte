@@ -57,12 +57,13 @@ class _DsCardState extends State<DsCard> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final effectiveColor = widget.gradient != null
         ? Colors.transparent
-        : (widget.color ?? AppColors.surface);
+        : (widget.color ?? cs.surface);
     final effectiveShadow = widget.shadow ?? AppTheme.shadowSm;
     final effectiveBorder =
-        widget.border ?? Border.all(color: AppColors.borderLight, width: 1);
+        widget.border ?? Border.all(color: cs.outlineVariant, width: 1);
 
     final card = Container(
       width: widget.width,

@@ -55,9 +55,9 @@ class _MissionCardProState extends State<MissionCardPro> {
         child: Container(
           margin: const EdgeInsets.only(bottom: 12),
           decoration: BoxDecoration(
-            color: AppColors.surface,
+            color: Theme.of(context).colorScheme.surface,
             borderRadius: AppSpacing.roundedLg,
-            border: Border.all(color: AppColors.borderLight),
+            border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
             boxShadow: AppTheme.shadowSm,
           ),
           child: Column(
