@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
 
 enum DsButtonVariant { primary, secondary, outline, ghost, danger }
 enum DsButtonSize { sm, md, lg }
 
-class DsButton extends StatelessWidget {
+class DsButton extends StatefulWidget {
   final String label;
   final VoidCallback? onPressed;
   final DsButtonVariant variant;
@@ -37,8 +38,8 @@ class DsButton extends StatelessWidget {
     this.iconTrailing = false,
     this.isLoading = false,
     this.fullWidth = true,
-  }) : variant = DsButtonVariant.outline,
-       gradient = false;
+  })  : variant = DsButtonVariant.outline,
+        gradient = false;
 
   const DsButton.ghost({
     super.key,
@@ -49,8 +50,8 @@ class DsButton extends StatelessWidget {
     this.iconTrailing = false,
     this.isLoading = false,
     this.fullWidth = false,
-  }) : variant = DsButtonVariant.ghost,
-       gradient = false;
+  })  : variant = DsButtonVariant.ghost,
+        gradient = false;
 
   const DsButton.danger({
     super.key,
@@ -61,88 +62,109 @@ class DsButton extends StatelessWidget {
     this.iconTrailing = false,
     this.isLoading = false,
     this.fullWidth = true,
-  }) : variant = DsButtonVariant.danger,
-       gradient = false;
+  })  : variant = DsButtonVariant.danger,
+        gradient = false;
+
+  @override
+  State<DsButton> createState() => _DsButtonState();
+}
+
+class _DsButtonState extends State<DsButton> {
+  bool _pressed = false;
+
+  void _onTapDown(TapDownDetails _) {
+    if (widget.onPressed == null || widget.isLoading) return;
+    HapticFeedback.lightImpact();
+    setState(() => _pressed = true);
+  }
+
+  void _onTapUp(TapUpDetails _) => setState(() => _pressed = false);
+  void _onTapCancel() => setState(() => _pressed = false);
 
   @override
   Widget build(BuildContext context) {
-    final _heights = {
+    const heights = {
       DsButtonSize.sm: AppSpacing.btnHeightSm,
       DsButtonSize.md: AppSpacing.btnHeightMd,
       DsButtonSize.lg: AppSpacing.btnHeightLg,
     };
-
-    final _paddings = {
-      DsButtonSize.sm: const EdgeInsets.symmetric(horizontal: 14),
-      DsButtonSize.md: const EdgeInsets.symmetric(horizontal: 20),
-      DsButtonSize.lg: const EdgeInsets.symmetric(horizontal: 28),
+    const paddings = {
+      DsButtonSize.sm: EdgeInsets.symmetric(horizontal: 14),
+      DsButtonSize.md: EdgeInsets.symmetric(horizontal: 20),
+      DsButtonSize.lg: EdgeInsets.symmetric(horizontal: 28),
     };
-
-    final _fontSizes = {
+    const fontSizes = {
       DsButtonSize.sm: 13.0,
       DsButtonSize.md: 15.0,
       DsButtonSize.lg: 16.0,
     };
-
-    final _iconSizes = {
+    const iconSizes = {
       DsButtonSize.sm: 16.0,
       DsButtonSize.md: 18.0,
       DsButtonSize.lg: 20.0,
     };
 
-    final height = _heights[size]!;
-    final padding = _paddings[size]!;
-    final fontSize = _fontSizes[size]!;
-    final iconSize = _iconSizes[size]!;
-
-    final isDisabled = onPressed == null || isLoading;
+    final height = heights[widget.size]!;
+    final padding = paddings[widget.size]!;
+    final fontSize = fontSizes[widget.size]!;
+    final iconSize = iconSizes[widget.size]!;
+    final isDisabled = widget.onPressed == null || widget.isLoading;
 
     // ── Colors per variant ────────────────────────────────────────────────
     Color bgColor;
     Color fgColor;
     Color borderColor;
 
-    switch (variant) {
+    switch (widget.variant) {
       case DsButtonVariant.primary:
-        bgColor = isDisabled ? AppColors.primary.withValues(alpha: 0.5) : AppColors.primary;
+        bgColor = isDisabled
+            ? AppColors.primary.withValues(alpha: 0.5)
+            : AppColors.primary;
         fgColor = Colors.white;
         borderColor = Colors.transparent;
         break;
       case DsButtonVariant.secondary:
-        bgColor = AppColors.accent.withValues(alpha: isDisabled ? 0.3 : 1);
+        bgColor =
+            AppColors.accent.withValues(alpha: isDisabled ? 0.3 : 1);
         fgColor = isDisabled ? Colors.white54 : AppColors.textHeading;
         borderColor = Colors.transparent;
         break;
       case DsButtonVariant.outline:
         bgColor = Colors.transparent;
-        fgColor = isDisabled ? AppColors.primary.withValues(alpha: 0.4) : AppColors.primary;
-        borderColor = isDisabled ? AppColors.primary.withValues(alpha: 0.3) : AppColors.primary;
+        fgColor = isDisabled
+            ? AppColors.primary.withValues(alpha: 0.4)
+            : AppColors.primary;
+        borderColor = isDisabled
+            ? AppColors.primary.withValues(alpha: 0.3)
+            : AppColors.primary;
         break;
       case DsButtonVariant.ghost:
         bgColor = Colors.transparent;
-        fgColor = isDisabled ? AppColors.textSecondary.withValues(alpha: 0.5) : AppColors.primary;
+        fgColor = isDisabled
+            ? AppColors.textSecondary.withValues(alpha: 0.5)
+            : AppColors.primary;
         borderColor = Colors.transparent;
         break;
       case DsButtonVariant.danger:
-        bgColor = isDisabled ? AppColors.error.withValues(alpha: 0.5) : AppColors.error;
+        bgColor = isDisabled
+            ? AppColors.error.withValues(alpha: 0.5)
+            : AppColors.error;
         fgColor = Colors.white;
         borderColor = Colors.transparent;
         break;
     }
 
-    Widget child;
-    if (isLoading) {
-      child = SizedBox(
+    // ── Content ───────────────────────────────────────────────────────────
+    Widget content;
+    if (widget.isLoading) {
+      content = SizedBox(
         width: 20,
         height: 20,
-        child: CircularProgressIndicator(
-          color: fgColor,
-          strokeWidth: 2,
-        ),
+        child: CircularProgressIndicator(color: fgColor, strokeWidth: 2),
       );
     } else {
       final textWidget = Text(
-        label,
+        widget.label,
         style: TextStyle(
           fontFamily: 'Inter',
           fontSize: fontSize,
@@ -151,51 +173,61 @@ class DsButton extends StatelessWidget {
           color: fgColor,
         ),
       );
-
-      if (icon != null) {
-        final iconWidget = Icon(icon, color: fgColor, size: iconSize);
-        child = Row(
+      if (widget.icon != null) {
+        final iconWidget =
+            Icon(widget.icon, color: fgColor, size: iconSize);
+        content = Row(
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
-          children: iconTrailing
+          children: widget.iconTrailing
               ? [textWidget, const SizedBox(width: 8), iconWidget]
               : [iconWidget, const SizedBox(width: 8), textWidget],
         );
       } else {
-        child = textWidget;
+        content = textWidget;
       }
     }
 
-    Widget btn = AnimatedContainer(
+    final btn = AnimatedContainer(
       duration: const Duration(milliseconds: 150),
       height: height,
-      width: fullWidth ? double.infinity : null,
+      width: widget.fullWidth ? double.infinity : null,
       decoration: BoxDecoration(
-        gradient: gradient && variant == DsButtonVariant.primary && !isDisabled
+        gradient: widget.gradient &&
+                widget.variant == DsButtonVariant.primary &&
+                !isDisabled
             ? AppTheme.primaryGradient
             : null,
-        color: gradient ? null : bgColor,
+        color: widget.gradient ? null : bgColor,
         borderRadius: AppSpacing.roundedLg,
         border: borderColor != Colors.transparent
             ? Border.all(color: borderColor, width: 1.5)
             : null,
-        boxShadow: !isDisabled && variant == DsButtonVariant.primary
+        boxShadow: !isDisabled && widget.variant == DsButtonVariant.primary
             ? AppTheme.shadowColored(AppColors.primary)
             : null,
       ),
       padding: padding,
-      child: Center(child: child),
+      child: Center(child: content),
     );
 
     return GestureDetector(
-      onTap: isDisabled ? null : onPressed,
-      child: btn,
+      onTap: isDisabled ? null : widget.onPressed,
+      onTapDown: _onTapDown,
+      onTapUp: _onTapUp,
+      onTapCancel: _onTapCancel,
+      child: AnimatedScale(
+        scale: _pressed && !isDisabled ? 0.96 : 1.0,
+        duration: const Duration(milliseconds: 100),
+        curve: Curves.easeOut,
+        child: btn,
+      ),
     );
   }
 }
 
-/// Bouton icône circulaire
-class DsIconButton extends StatelessWidget {
+// ── Bouton icône circulaire ───────────────────────────────────────────────────
+class DsIconButton extends StatefulWidget {
   final IconData icon;
   final VoidCallback? onTap;
   final Color? color;
@@ -216,29 +248,51 @@ class DsIconButton extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final bg = color ?? AppColors.surfaceVariant;
-    final fg = iconColor ?? AppColors.textPrimary;
+  State<DsIconButton> createState() => _DsIconButtonState();
+}
 
-    Widget btn = GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          color: bg,
-          shape: BoxShape.circle,
-          border: bordered
-              ? Border.all(color: AppColors.border)
-              : null,
+class _DsIconButtonState extends State<DsIconButton> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = widget.color ?? AppColors.surfaceVariant;
+    final fg = widget.iconColor ?? AppColors.textPrimary;
+
+    Widget result = GestureDetector(
+      onTap: widget.onTap,
+      onTapDown: widget.onTap != null
+          ? (_) {
+              HapticFeedback.lightImpact();
+              setState(() => _pressed = true);
+            }
+          : null,
+      onTapUp: widget.onTap != null
+          ? (_) => setState(() => _pressed = false)
+          : null,
+      onTapCancel: widget.onTap != null
+          ? () => setState(() => _pressed = false)
+          : null,
+      child: AnimatedScale(
+        scale: _pressed && widget.onTap != null ? 0.90 : 1.0,
+        duration: const Duration(milliseconds: 100),
+        curve: Curves.easeOut,
+        child: Container(
+          width: widget.size,
+          height: widget.size,
+          decoration: BoxDecoration(
+            color: bg,
+            shape: BoxShape.circle,
+            border: widget.bordered ? Border.all(color: AppColors.border) : null,
+          ),
+          child: Icon(widget.icon, color: fg, size: widget.size * 0.5),
         ),
-        child: Icon(icon, color: fg, size: size * 0.5),
       ),
     );
 
-    if (tooltip != null) {
-      return Tooltip(message: tooltip!, child: btn);
+    if (widget.tooltip != null) {
+      return Tooltip(message: widget.tooltip!, child: result);
     }
-    return btn;
+    return result;
   }
 }

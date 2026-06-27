@@ -3,7 +3,7 @@ import '../theme/app_theme.dart';
 
 /// Carte de base du design system.
 /// Remplace les Container(decoration: BoxDecoration...) éparpillés dans les screens.
-class DsCard extends StatelessWidget {
+class DsCard extends StatefulWidget {
   final Widget child;
   final EdgeInsetsGeometry? padding;
   final EdgeInsetsGeometry? margin;
@@ -49,30 +49,50 @@ class DsCard extends StatelessWidget {
   }) : shadow = const [];
 
   @override
-  Widget build(BuildContext context) {
-    final effectiveColor = gradient != null ? Colors.transparent : (color ?? AppColors.surface);
-    final effectiveShadow = shadow ?? AppTheme.shadowSm;
-    final effectiveBorder = border ??
-        Border.all(color: AppColors.borderLight, width: 1);
+  State<DsCard> createState() => _DsCardState();
+}
 
-    Widget card = Container(
-      width: width,
-      height: height,
-      margin: margin,
-      padding: padding,
-      clipBehavior: clipBehavior,
+class _DsCardState extends State<DsCard> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final effectiveColor = widget.gradient != null
+        ? Colors.transparent
+        : (widget.color ?? AppColors.surface);
+    final effectiveShadow = widget.shadow ?? AppTheme.shadowSm;
+    final effectiveBorder =
+        widget.border ?? Border.all(color: AppColors.borderLight, width: 1);
+
+    final card = Container(
+      width: widget.width,
+      height: widget.height,
+      margin: widget.margin,
+      padding: widget.padding,
+      clipBehavior: widget.clipBehavior,
       decoration: BoxDecoration(
         color: effectiveColor,
-        gradient: gradient,
-        borderRadius: BorderRadius.circular(radius),
+        gradient: widget.gradient,
+        borderRadius: BorderRadius.circular(widget.radius),
         border: effectiveBorder,
         boxShadow: effectiveShadow,
       ),
-      child: child,
+      child: widget.child,
     );
 
-    if (onTap != null) {
-      return GestureDetector(onTap: onTap, child: card);
+    if (widget.onTap != null) {
+      return GestureDetector(
+        onTap: widget.onTap,
+        onTapDown: (_) => setState(() => _pressed = true),
+        onTapUp: (_) => setState(() => _pressed = false),
+        onTapCancel: () => setState(() => _pressed = false),
+        child: AnimatedScale(
+          scale: _pressed ? 0.97 : 1.0,
+          duration: const Duration(milliseconds: 100),
+          curve: Curves.easeOut,
+          child: card,
+        ),
+      );
     }
     return card;
   }
