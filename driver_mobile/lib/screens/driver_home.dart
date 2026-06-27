@@ -48,9 +48,13 @@ class _DriverHomeState extends State<DriverHome> {
   final Set<String> _knownMissionIds = {};
   bool _isFirstMissionSnapshot = true;
 
+  late final Stream<QuerySnapshot> _missionsTodayStream;
+  late final Stream<QuerySnapshot> _missionsDoneStream;
+
   @override
   void initState() {
     super.initState();
+    _initKpiStreams();
     _loadProfile();
     _startMissionNotifications();
     _initMissionListener();
@@ -101,6 +105,26 @@ class _DriverHomeState extends State<DriverHome> {
 
     _lastRawHeading = h;
     setState(() => _headingTurns += delta / 360.0);
+  }
+
+  void _initKpiStreams() {
+    final uid = _authService.currentUid ?? '';
+    final today = DateTime.now();
+    final startOfDay = Timestamp.fromDate(
+      DateTime(today.year, today.month, today.day),
+    );
+
+    _missionsTodayStream = FirebaseFirestore.instance
+        .collection('missions')
+        .where('assignedTo', isEqualTo: uid)
+        .where('createdAt', isGreaterThanOrEqualTo: startOfDay)
+        .snapshots();
+
+    _missionsDoneStream = FirebaseFirestore.instance
+        .collection('missions')
+        .where('assignedTo', isEqualTo: uid)
+        .where('status', whereIn: ['completed', 'terminée'])
+        .snapshots();
   }
 
   Future<void> _loadProfile() async {
@@ -275,19 +299,35 @@ class _DriverHomeState extends State<DriverHome> {
         mainAxisSpacing: 12,
         crossAxisSpacing: 12,
         childAspectRatio: 1.1,
-        children: const [
-          KpiCard(
-            title: "Missions / Jour",
-            value: "08",
-            icon: Icons.route_rounded,
-            trend: "+12%",
+        children: [
+          StreamBuilder<QuerySnapshot>(
+            stream: _missionsTodayStream,
+            builder: (context, snapshot) {
+              final count = snapshot.data?.docs.length ?? 0;
+              final loaded = snapshot.hasData;
+              return KpiCard(
+                title: "Missions / Jour",
+                value: loaded ? count.toString().padLeft(2, '0') : '--',
+                icon: Icons.route_rounded,
+                subtitle: loaded ? (count == 0 ? 'Aucune' : 'Aujourd\'hui') : null,
+                subtitleColor: count > 0 ? AppColors.primary : AppColors.textSecondary,
+              );
+            },
           ),
-          KpiCard(
-            title: "KM Parcourus",
-            value: "1 240",
-            icon: Icons.speed_rounded,
-            iconColor: AppColors.warning,
-            trend: "+5%",
+          StreamBuilder<QuerySnapshot>(
+            stream: _missionsDoneStream,
+            builder: (context, snapshot) {
+              final count = snapshot.data?.docs.length ?? 0;
+              final loaded = snapshot.hasData;
+              return KpiCard(
+                title: "Terminées",
+                value: loaded ? count.toString() : '--',
+                icon: Icons.check_circle_outline_rounded,
+                iconColor: AppColors.success,
+                subtitle: loaded ? 'Au total' : null,
+                subtitleColor: AppColors.success,
+              );
+            },
           ),
         ],
       ),
