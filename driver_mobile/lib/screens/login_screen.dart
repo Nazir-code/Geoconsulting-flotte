@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
+import '../theme/app_transitions.dart';
 import 'register_screen.dart';
 import 'forgot_password_screen.dart';
 
@@ -285,8 +286,7 @@ class _LoginScreenState extends State<LoginScreen>
             child: TextButton(
               onPressed: () => Navigator.push(
                 context,
-                MaterialPageRoute(
-                    builder: (_) => const ForgotPasswordScreen()),
+                AppTransitions.slideRight(const ForgotPasswordScreen()),
               ),
               style: TextButton.styleFrom(
                 padding:
@@ -364,7 +364,7 @@ class _LoginScreenState extends State<LoginScreen>
             TextButton(
               onPressed: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const RegisterScreen()),
+                AppTransitions.slideRight(const RegisterScreen()),
               ),
               child: Text(
                 "Créer un compte",

@@ -4,6 +4,7 @@ import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
 import '../models/driver_profile.dart';
 import '../theme/app_theme.dart';
+import '../theme/app_transitions.dart';
 import '../widgets/ds_badge.dart';
 import 'splash_screen.dart';
 
@@ -453,7 +454,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               // On remplace toute la pile : l'ancien AuthWrapper est retiré,
               // le splash relance ensuite le flux (utilisateur déconnecté → login).
               Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (_) => const SplashScreen()),
+                AppTransitions.fade(const SplashScreen()),
                 (route) => false,
               );
               _authService.signOut();

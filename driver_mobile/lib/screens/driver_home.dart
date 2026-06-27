@@ -8,6 +8,7 @@ import 'package:geolocator/geolocator.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
 import '../services/new_location_service.dart';
+import '../theme/app_transitions.dart';
 import '../services/gps_lifecycle_manager.dart';
 import '../services/firebase_notification_service.dart';
 import '../models/driver_profile.dart';
@@ -329,7 +330,7 @@ class _DriverHomeState extends State<DriverHome> {
               color: AppColors.accent,
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const TrackingScreen()),
+                AppTransitions.slideUp(const TrackingScreen()),
               ),
             ),
             QuickActionButton(
@@ -446,7 +447,7 @@ class _DriverHomeState extends State<DriverHome> {
                   GestureDetector(
                     onTap: () => Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const TrackingScreen()),
+                      AppTransitions.slideUp(const TrackingScreen()),
                     ),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -734,7 +735,7 @@ class _DriverHomeState extends State<DriverHome> {
       Navigator.pop(context);
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const TrackingScreen()),
+        AppTransitions.slideUp(const TrackingScreen()),
       );
     } catch (error) {
       if (!mounted) return;

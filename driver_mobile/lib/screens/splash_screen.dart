@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../main.dart' show AuthWrapper;
 import '../theme/app_colors.dart';
+import '../theme/app_transitions.dart';
 
 /// Écran de démarrage (Splash) affiché au lancement de l'application.
 ///
@@ -54,7 +55,7 @@ class _SplashScreenState extends State<SplashScreen>
     if (!mounted) return;
 
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const AuthWrapper()),
+      AppTransitions.fade(const AuthWrapper()),
     );
   }
 
