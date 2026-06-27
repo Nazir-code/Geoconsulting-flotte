@@ -20,6 +20,7 @@ class _MissionsScreenState extends State<MissionsScreen>
 
   String _selectedFilter = 'all';
   String? _busyMissionId;
+  int _refreshKey = 0;
 
   static const _filters = [
     (value: 'all',                              label: 'Toutes'),
@@ -63,24 +64,37 @@ class _MissionsScreenState extends State<MissionsScreen>
           child: _buildFilterBar(),
         ),
       ),
-      body: uid == null
-          ? _buildNotConnected()
-          : StreamBuilder<QuerySnapshot>(
-              stream: _getFilteredStream(uid),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return _buildLoading();
-                }
-                if (snapshot.hasError) {
-                  return _buildError(snapshot.error.toString());
-                }
-                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                  return _buildEmptyState();
-                }
-                return _buildList(snapshot.data!.docs, uid);
-              },
-            ),
+      body: RefreshIndicator(
+        onRefresh: _handleRefresh,
+        color: AppColors.primary,
+        backgroundColor: AppColors.surface,
+        strokeWidth: 2.5,
+        displacement: 60,
+        child: uid == null
+            ? _buildNotConnected()
+            : StreamBuilder<QuerySnapshot>(
+                key: ValueKey('$_selectedFilter:$_refreshKey'),
+                stream: _getFilteredStream(uid),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return _buildLoading();
+                  }
+                  if (snapshot.hasError) {
+                    return _buildError(snapshot.error.toString());
+                  }
+                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                    return _buildEmptyState();
+                  }
+                  return _buildList(snapshot.data!.docs, uid);
+                },
+              ),
+      ),
     );
+  }
+
+  Future<void> _handleRefresh() async {
+    setState(() => _refreshKey++);
+    await Future.delayed(const Duration(milliseconds: 700));
   }
 
   // ── Filter bar ────────────────────────────────────────────────────────────
@@ -183,8 +197,8 @@ class _MissionsScreenState extends State<MissionsScreen>
   }
 
   Widget _buildNotConnected() {
-    return Center(
-      child: Column(
+    return _scrollableCenter(
+      Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           const Icon(Icons.account_circle_outlined,
@@ -197,15 +211,15 @@ class _MissionsScreenState extends State<MissionsScreen>
   }
 
   Widget _buildError(String msg) {
-    return Center(
-      child: Padding(
+    return _scrollableCenter(
+      Padding(
         padding: AppSpacing.pagePadding,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: AppColors.errorLight,
                 shape: BoxShape.circle,
               ),
@@ -228,10 +242,21 @@ class _MissionsScreenState extends State<MissionsScreen>
     );
   }
 
+  Widget _scrollableCenter(Widget child) {
+    return LayoutBuilder(
+      builder: (_, constraints) => SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+          child: Center(child: child),
+        ),
+      ),
+    );
+  }
+
   Widget _buildEmptyState() {
     final isFiltered = _selectedFilter != 'all';
-    return Center(
-      child: Padding(
+    return _scrollableCenter(Padding(
         padding: AppSpacing.pagePadding,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -285,8 +310,7 @@ class _MissionsScreenState extends State<MissionsScreen>
             ],
           ],
         ),
-      ),
-    );
+    ));
   }
 
   // ── Firestore query ───────────────────────────────────────────────────────

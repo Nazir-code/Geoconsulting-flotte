@@ -203,6 +203,10 @@ class _DriverHomeState extends State<DriverHome> {
     );
   }
 
+  Future<void> _refreshHome() async {
+    await _loadProfile();
+  }
+
   void _toggleStatus(bool online) async {
     setState(() => _isOnline = online);
     await GpsLifecycleManager().setDriverOnline(online);
@@ -222,18 +226,27 @@ class _DriverHomeState extends State<DriverHome> {
       backgroundColor: AppColors.background,
       body: SafeArea(
         child: DsShimmer(
-          child: CustomScrollView(
-            physics: const BouncingScrollPhysics(),
-            slivers: [
-              _buildTopBar(),
-              _buildKpiSection(),
-              _buildVehicleSection(),
-              _buildQuickActions(),
-              _buildMapPreview(),
-              _buildRecentMissionsHeader(),
-              _buildRecentMissionsList(),
-              const SliverToBoxAdapter(child: SizedBox(height: 100)),
-            ],
+          child: RefreshIndicator(
+            onRefresh: _refreshHome,
+            color: AppColors.primary,
+            backgroundColor: AppColors.surface,
+            strokeWidth: 2.5,
+            displacement: 60,
+            child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(
+                parent: BouncingScrollPhysics(),
+              ),
+              slivers: [
+                _buildTopBar(),
+                _buildKpiSection(),
+                _buildVehicleSection(),
+                _buildQuickActions(),
+                _buildMapPreview(),
+                _buildRecentMissionsHeader(),
+                _buildRecentMissionsList(),
+                const SliverToBoxAdapter(child: SizedBox(height: 100)),
+              ],
+            ),
           ),
         ),
       ),
