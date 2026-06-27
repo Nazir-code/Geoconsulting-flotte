@@ -4,6 +4,7 @@ import '../services/auth_service.dart';
 import '../services/missions_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/mission_card_pro.dart';
+import '../widgets/ds_shimmer.dart';
 
 class MissionsScreen extends StatefulWidget {
   const MissionsScreen({super.key});
@@ -172,10 +173,11 @@ class _MissionsScreenState extends State<MissionsScreen>
 
   // ── States ────────────────────────────────────────────────────────────────
   Widget _buildLoading() {
-    return const Center(
-      child: CircularProgressIndicator(
-        color: AppColors.primary,
-        strokeWidth: 2.5,
+    return DsShimmer(
+      child: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
+        itemCount: 5,
+        itemBuilder: (_, __) => const MissionCardSkeleton(),
       ),
     );
   }

@@ -13,6 +13,7 @@ import '../services/gps_lifecycle_manager.dart';
 import '../services/firebase_notification_service.dart';
 import '../models/driver_profile.dart';
 import '../widgets/kpi_card.dart';
+import '../widgets/ds_shimmer.dart';
 import '../widgets/status_switch.dart';
 import '../widgets/vehicle_status_card.dart';
 import '../widgets/quick_action_button.dart';
@@ -220,18 +221,20 @@ class _DriverHomeState extends State<DriverHome> {
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: CustomScrollView(
-          physics: const BouncingScrollPhysics(),
-          slivers: [
-            _buildTopBar(),
-            _buildKpiSection(),
-            _buildVehicleSection(),
-            _buildQuickActions(),
-            _buildMapPreview(),
-            _buildRecentMissionsHeader(),
-            _buildRecentMissionsList(),
-            const SliverToBoxAdapter(child: SizedBox(height: 100)),
-          ],
+        child: DsShimmer(
+          child: CustomScrollView(
+            physics: const BouncingScrollPhysics(),
+            slivers: [
+              _buildTopBar(),
+              _buildKpiSection(),
+              _buildVehicleSection(),
+              _buildQuickActions(),
+              _buildMapPreview(),
+              _buildRecentMissionsHeader(),
+              _buildRecentMissionsList(),
+              const SliverToBoxAdapter(child: SizedBox(height: 100)),
+            ],
+          ),
         ),
       ),
     );
@@ -303,28 +306,29 @@ class _DriverHomeState extends State<DriverHome> {
           StreamBuilder<QuerySnapshot>(
             stream: _missionsTodayStream,
             builder: (context, snapshot) {
-              final count = snapshot.data?.docs.length ?? 0;
-              final loaded = snapshot.hasData;
+              if (!snapshot.hasData) return const KpiCardSkeleton();
+              final count = snapshot.data!.docs.length;
               return KpiCard(
                 title: "Missions / Jour",
-                value: loaded ? count.toString().padLeft(2, '0') : '--',
+                value: count.toString().padLeft(2, '0'),
                 icon: Icons.route_rounded,
-                subtitle: loaded ? (count == 0 ? 'Aucune' : 'Aujourd\'hui') : null,
-                subtitleColor: count > 0 ? AppColors.primary : AppColors.textSecondary,
+                subtitle: count == 0 ? 'Aucune' : 'Aujourd\'hui',
+                subtitleColor:
+                    count > 0 ? AppColors.primary : AppColors.textSecondary,
               );
             },
           ),
           StreamBuilder<QuerySnapshot>(
             stream: _missionsDoneStream,
             builder: (context, snapshot) {
-              final count = snapshot.data?.docs.length ?? 0;
-              final loaded = snapshot.hasData;
+              if (!snapshot.hasData) return const KpiCardSkeleton();
+              final count = snapshot.data!.docs.length;
               return KpiCard(
                 title: "Terminées",
-                value: loaded ? count.toString() : '--',
+                value: count.toString(),
                 icon: Icons.check_circle_outline_rounded,
                 iconColor: AppColors.success,
-                subtitle: loaded ? 'Au total' : null,
+                subtitle: 'Au total',
                 subtitleColor: AppColors.success,
               );
             },
@@ -550,15 +554,14 @@ class _DriverHomeState extends State<DriverHome> {
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.all(20),
-              child: Center(
-                child: CircularProgressIndicator(
-                  color: AppColors.primary,
-                  strokeWidth: 2,
-                ),
-              ),
+          return SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate(const [
+                MissionCardSkeleton(),
+                MissionCardSkeleton(),
+                MissionCardSkeleton(),
+              ]),
             ),
           );
         }
