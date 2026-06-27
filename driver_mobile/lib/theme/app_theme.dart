@@ -363,6 +363,38 @@ class AppTheme {
         linearMinHeight: 4,
       ),
 
+      // ── NavigationBar (Material 3) ─────────────────────────────────────────
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: AppColors.surface,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        shadowColor: Colors.transparent,
+        indicatorColor: AppColors.primaryLight,
+        indicatorShape: const StadiumBorder(),
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return const TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: AppColors.primary,
+            );
+          }
+          return const TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
+            color: AppColors.textSecondary,
+          );
+        }),
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return const IconThemeData(color: AppColors.primary, size: 24);
+          }
+          return const IconThemeData(color: AppColors.textSecondary, size: 24);
+        }),
+      ),
+
       // ── Typography ────────────────────────────────────────────────────────
       textTheme: _buildTextTheme(AppColors.textPrimary),
     );
@@ -428,6 +460,36 @@ class AppTheme {
         margin: const EdgeInsets.only(bottom: 12),
       ),
       textTheme: _buildTextTheme(const Color(0xFFE2E8F0)),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: const Color(0xFF1E293B),
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        shadowColor: Colors.transparent,
+        indicatorColor: const Color(0xFF164E63),
+        indicatorShape: const StadiumBorder(),
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return const TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: AppColors.accent,
+            );
+          }
+          return const TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
+            color: AppColors.darkTextSecondary,
+          );
+        }),
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return const IconThemeData(color: AppColors.accent, size: 24);
+          }
+          return const IconThemeData(color: AppColors.darkTextSecondary, size: 24);
+        }),
+      ),
     );
   }
 
