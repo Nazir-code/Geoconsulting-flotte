@@ -4,10 +4,11 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { GpsSimulatorService } from './simulator.js';
-import './firebaseAdmin.js';  // Initialize Firebase Admin
+import firebaseAdmin from './firebaseAdmin.js';  // Initialize Firebase Admin
 import { createFirebaseStore } from './firebaseStore.js';
 import { MissionStatusController } from './controllers/missionStatusController.js';
 import { RealtimeEventManager } from './services/realtimeEventManager.js';
+import { sendMissionAssignedPush } from './services/missionNotificationService.js';
 
 dotenv.config();
 
@@ -246,6 +247,7 @@ app.post('/api/driver/me/register-firebase-uid', requireDriverAuth, async (req, 
     console.log(`   ├─ Driver Name: ${driver.name || 'N/A'}`);
 
     // Update the driver document with the Firebase UID
+    const db = firebaseAdmin.firestore();
     await db.collection('drivers').doc(driver.id).update({
       firebaseUid: firebaseUid,
       updatedAt: new Date().toISOString(),
@@ -445,6 +447,53 @@ app.get('/api/driver/me/notifications', requireDriverAuth, async (req, res) => {
     res.json(buildApiResponse(notifications));
   } catch (error) {
     handleRouteError(res, error);
+  }
+});
+
+// Vérifie un Firebase ID token (managers/admins web). À la différence de
+// requireDriverAuth (token maison "driver-token-*"), on valide ici un vrai
+// ID token Firebase via l'Admin SDK.
+async function requireFirebaseAuth(req, res, next) {
+  const authHeader = req.headers.authorization || '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+
+  if (!token) {
+    res.status(401).json({ success: false, error: 'Authentification requise.' });
+    return;
+  }
+
+  try {
+    const decoded = await firebaseAdmin.auth().verifyIdToken(token);
+    req.firebaseUid = decoded.uid;
+    req.firebaseUser = decoded;
+    next();
+  } catch (error) {
+    res.status(401).json({ success: false, error: 'ID token Firebase invalide.' });
+  }
+}
+
+// Déclenche le push FCM "mission assignée". Appelé par le frontend web juste
+// après l'écriture Firestore de la mission (création ou (ré)assignation).
+// Remplace la Cloud Function notifyDriverOnMissionCreated sans exiger Blaze.
+app.post('/api/notifications/mission-assigned', requireFirebaseAuth, async (req, res) => {
+  try {
+    const { missionId } = req.body || {};
+    if (!missionId || typeof missionId !== 'string') {
+      res.status(400).json({ success: false, error: 'missionId requis.' });
+      return;
+    }
+
+    const db = firebaseAdmin.firestore();
+    const missionDoc = await db.collection('missions').doc(missionId).get();
+    if (!missionDoc.exists) {
+      res.status(404).json({ success: false, error: 'Mission introuvable.' });
+      return;
+    }
+
+    const result = await sendMissionAssignedPush(db, missionId, missionDoc.data());
+    res.json(buildApiResponse(result, result.sent ? 'Notification envoyée.' : 'Notification non envoyée.'));
+  } catch (error) {
+    handleRouteError(res, error, 500);
   }
 });
 

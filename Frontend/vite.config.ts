@@ -5,7 +5,7 @@ import path from 'path';
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: process.env.VERCEL || process.env.NODE_ENV === 'production' ? '/' : '/ApplicationFlotteVehicule/',
+  base: '/',
   server: {
     host: true,   // Expose sur le réseau local (tablette, téléphone, etc.)
     allowedHosts: true,

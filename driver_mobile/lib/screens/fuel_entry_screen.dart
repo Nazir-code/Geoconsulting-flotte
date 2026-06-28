@@ -100,11 +100,11 @@ class _FuelEntryScreenState extends State<FuelEntryScreen> {
         (double.tryParse(_priceCtrl.text.trim().replaceAll(',', '.')) ?? 0);
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: context.palette.background,
       appBar: AppBar(
         title: const Text('Ajouter un plein'),
-        backgroundColor: AppColors.surface,
-        foregroundColor: AppColors.textHeading,
+        backgroundColor: context.palette.surface,
+        foregroundColor: context.palette.textHeading,
         elevation: 0,
       ),
       body: _loadingVehicles
@@ -131,10 +131,10 @@ class _FuelEntryScreenState extends State<FuelEntryScreen> {
                     onChanged: (val) => setState(() => _selectedVehicleId = val),
                   ),
                   if (_vehicles.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 6),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
                       child: Text('Aucun véhicule disponible.',
-                          style: TextStyle(color: AppColors.error, fontSize: 12)),
+                          style: AppTextStyles.caption.copyWith(color: AppColors.error)),
                     ),
                   const SizedBox(height: 16),
                   _label('Quantité (litres)'),
@@ -175,10 +175,10 @@ class _FuelEntryScreenState extends State<FuelEntryScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Coût total', style: TextStyle(color: AppColors.textSecondary)),
+                        Text('Coût total', style: AppTextStyles.body.copyWith(color: AppColors.textSecondary)),
                         Text('${total.toStringAsFixed(0)} FCFA',
-                            style: const TextStyle(
-                                color: AppColors.primary, fontWeight: FontWeight.w800, fontSize: 16)),
+                            style: AppTextStyles.h5.copyWith(
+                                color: AppColors.primary, fontWeight: FontWeight.w800)),
                       ],
                     ),
                   ),
@@ -196,8 +196,8 @@ class _FuelEntryScreenState extends State<FuelEntryScreen> {
                           ? const SizedBox(
                               width: 20, height: 20,
                               child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                          : const Text('Enregistrer le plein',
-                              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                          : Text('Enregistrer le plein',
+                              style: AppTextStyles.btnLg.copyWith(fontSize: 15, letterSpacing: 0)),
                     ),
                   ),
                 ],
@@ -209,22 +209,21 @@ class _FuelEntryScreenState extends State<FuelEntryScreen> {
   Widget _label(String text) => Padding(
         padding: const EdgeInsets.only(bottom: 6),
         child: Text(text,
-            style: const TextStyle(
-                color: AppColors.textSecondary, fontSize: 13, fontWeight: FontWeight.w600)),
+            style: AppTextStyles.label.copyWith(color: AppColors.textSecondary)),
       );
 
   InputDecoration _dec(String hint) => InputDecoration(
         hintText: hint,
         filled: true,
-        fillColor: AppColors.surface,
+        fillColor: context.palette.surface,
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         border: OutlineInputBorder(
           borderRadius: AppSpacing.roundedMd,
-          borderSide: const BorderSide(color: AppColors.border),
+          borderSide: BorderSide(color: context.palette.border),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: AppSpacing.roundedMd,
-          borderSide: const BorderSide(color: AppColors.border),
+          borderSide: BorderSide(color: context.palette.border),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: AppSpacing.roundedMd,

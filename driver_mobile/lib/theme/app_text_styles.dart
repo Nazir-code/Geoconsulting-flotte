@@ -8,7 +8,6 @@ class AppTextStyles {
     fontSize: 40,
     fontWeight: FontWeight.w800,
     letterSpacing: -1.5,
-    color: AppColors.textHeading,
     height: 1.1,
   );
 
@@ -17,7 +16,6 @@ class AppTextStyles {
     fontSize: 32,
     fontWeight: FontWeight.w700,
     letterSpacing: -1,
-    color: AppColors.textHeading,
     height: 1.15,
   );
 
@@ -27,7 +25,6 @@ class AppTextStyles {
     fontSize: 28,
     fontWeight: FontWeight.w700,
     letterSpacing: -0.5,
-    color: AppColors.textHeading,
     height: 1.2,
   );
 
@@ -36,7 +33,6 @@ class AppTextStyles {
     fontSize: 24,
     fontWeight: FontWeight.w700,
     letterSpacing: -0.3,
-    color: AppColors.textHeading,
     height: 1.25,
   );
 
@@ -45,7 +41,6 @@ class AppTextStyles {
     fontSize: 20,
     fontWeight: FontWeight.w600,
     letterSpacing: -0.2,
-    color: AppColors.textHeading,
     height: 1.3,
   );
 
@@ -53,7 +48,6 @@ class AppTextStyles {
     fontFamily: 'Inter',
     fontSize: 18,
     fontWeight: FontWeight.w600,
-    color: AppColors.textHeading,
     height: 1.35,
   );
 
@@ -61,7 +55,6 @@ class AppTextStyles {
     fontFamily: 'Inter',
     fontSize: 16,
     fontWeight: FontWeight.w600,
-    color: AppColors.textHeading,
     height: 1.4,
   );
 
@@ -69,7 +62,6 @@ class AppTextStyles {
     fontFamily: 'Inter',
     fontSize: 14,
     fontWeight: FontWeight.w600,
-    color: AppColors.textHeading,
     height: 1.4,
   );
 
@@ -78,7 +70,6 @@ class AppTextStyles {
     fontFamily: 'Inter',
     fontSize: 16,
     fontWeight: FontWeight.w400,
-    color: AppColors.textPrimary,
     height: 1.6,
   );
 
@@ -86,7 +77,6 @@ class AppTextStyles {
     fontFamily: 'Inter',
     fontSize: 14,
     fontWeight: FontWeight.w400,
-    color: AppColors.textPrimary,
     height: 1.55,
   );
 
@@ -111,7 +101,6 @@ class AppTextStyles {
     fontFamily: 'Inter',
     fontSize: 15,
     fontWeight: FontWeight.w600,
-    color: AppColors.textPrimary,
     letterSpacing: 0.1,
   );
 
@@ -119,7 +108,6 @@ class AppTextStyles {
     fontFamily: 'Inter',
     fontSize: 13,
     fontWeight: FontWeight.w600,
-    color: AppColors.textPrimary,
     letterSpacing: 0.1,
   );
 
@@ -166,7 +154,6 @@ class AppTextStyles {
     fontFamily: 'Inter',
     fontSize: 32,
     fontWeight: FontWeight.w800,
-    color: AppColors.textHeading,
     letterSpacing: -1,
   );
 
@@ -174,7 +161,6 @@ class AppTextStyles {
     fontFamily: 'Inter',
     fontSize: 24,
     fontWeight: FontWeight.w700,
-    color: AppColors.textHeading,
     letterSpacing: -0.5,
   );
 
@@ -182,7 +168,6 @@ class AppTextStyles {
     fontFamily: 'Inter',
     fontSize: 18,
     fontWeight: FontWeight.w700,
-    color: AppColors.textHeading,
   );
 
   // ─── Mono (coordonnées GPS etc.) ──────────────────────────────────────────

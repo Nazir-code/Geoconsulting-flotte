@@ -25,12 +25,13 @@ class KpiCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: cs.surface,
         borderRadius: AppSpacing.roundedLg,
-        border: Border.all(color: AppColors.borderLight),
+        border: Border.all(color: cs.outlineVariant),
         boxShadow: AppTheme.shadowSm,
       ),
       child: Column(

@@ -72,11 +72,6 @@ class _TrackingScreenState extends State<TrackingScreen>
     if (!mounted) return;
     final newLatLng = LatLng(pos.latitude, pos.longitude);
     setState(() => _currentLatLng = newLatLng);
-    // GPS bearing quand le véhicule se déplace — plus fiable que la boussole
-    // en mouvement, et couvre le cas où FlutterCompass.events est null.
-    if (pos.speed > 0.5 && pos.heading >= 0) {
-      _applyCompassHeading(pos.heading);
-    }
     if (_followMode) {
       _mapController.move(newLatLng, _mapController.camera.zoom);
     }

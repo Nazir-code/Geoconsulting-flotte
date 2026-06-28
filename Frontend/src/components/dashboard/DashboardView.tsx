@@ -15,6 +15,12 @@ import { FirestoreVehicleService } from '@/services/firestoreVehicleService';
 import { FirestoreFuelService } from '@/services/firestoreFuelService';
 import { FirestoreMaintenanceService } from '@/services/firestoreMaintenanceService';
 import type { DashboardStats, ActivityItem, Mission } from '@/types';
+import landCruiserImg from '@/assets/vehicles/landcruiser.png';
+import missionsImg from '@/assets/kpi/missions.png';
+import driversImg from '@/assets/kpi/drivers.png';
+import fuelImg from '@/assets/kpi/fuel.png';
+import alertsImg from '@/assets/kpi/alerts.png';
+import { setPendingFleetTab } from '@/lib/fleetNav';
 
 export function DashboardView() {
   const [stats, setStats] = useState<DashboardStats>({
@@ -114,8 +120,8 @@ export function DashboardView() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+      <div className="space-y-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5">
           {Array.from({ length: 5 }).map((_, i) => (
             <SkeletonKPICard key={i} />
           ))}
@@ -128,19 +134,26 @@ export function DashboardView() {
     );
   }
 
+  // Raccourci : un clic sur une carte KPI saute à la section correspondante
+  // (réutilise l'event de navigation déjà géré dans App.tsx).
+  const goTo = (section: string) => () =>
+    window.dispatchEvent(new CustomEvent('navigate-section', { detail: section }));
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5 }}
-      className="space-y-6"
+      className="space-y-8"
     >
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5">
         <KPICard
           title="Total Véhicules"
           value={stats.totalVehicles}
           icon={Car}
+          image={landCruiserImg}
+          onClick={goTo('fleet')}
           color="cyan"
           delay={0}
         />
@@ -148,6 +161,8 @@ export function DashboardView() {
           title="Missions Actives"
           value={stats.activeMissions}
           icon={Route}
+          image={missionsImg}
+          onClick={goTo('missions')}
           color="violet"
           delay={0.1}
         />
@@ -155,6 +170,11 @@ export function DashboardView() {
           title="Chauffeurs"
           value={stats.totalDrivers}
           icon={Users}
+          image={driversImg}
+          onClick={() => {
+            setPendingFleetTab('drivers');
+            goTo('fleet')();
+          }}
           color="lime"
           delay={0.2}
         />
@@ -163,6 +183,8 @@ export function DashboardView() {
           value={stats.monthlyFuelCost}
           suffix="FCFA"
           icon={Fuel}
+          image={fuelImg}
+          onClick={goTo('fuel')}
           color="orange"
           delay={0.3}
         />
@@ -170,6 +192,8 @@ export function DashboardView() {
           title="Alertes"
           value={stats.maintenanceAlerts + stats.fuelAnomalies}
           icon={AlertTriangle}
+          image={alertsImg}
+          onClick={goTo('reports')}
           color="orange"
           delay={0.4}
         />

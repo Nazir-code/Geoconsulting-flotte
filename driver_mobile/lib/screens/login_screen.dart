@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
+import '../theme/app_transitions.dart';
 import 'register_screen.dart';
 import 'forgot_password_screen.dart';
 
@@ -22,22 +24,39 @@ class _LoginScreenState extends State<LoginScreen>
   bool _obscurePassword = true;
   String? _errorMessage;
 
-  late final AnimationController _fadeCtrl;
-  late final Animation<double> _fadeAnim;
+  late final AnimationController _ctrl;
+  late final Animation<double> _headerAnim;
+  late final Animation<double> _sheetFadeAnim;
+  late final Animation<Offset> _sheetSlideAnim;
 
   @override
   void initState() {
     super.initState();
-    _fadeCtrl = AnimationController(
+    _ctrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 600),
+      duration: const Duration(milliseconds: 700),
     )..forward();
-    _fadeAnim = CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOut);
+
+    _headerAnim = CurvedAnimation(
+      parent: _ctrl,
+      curve: const Interval(0.0, 0.65, curve: Curves.easeOut),
+    );
+    _sheetFadeAnim = CurvedAnimation(
+      parent: _ctrl,
+      curve: const Interval(0.15, 0.8, curve: Curves.easeOut),
+    );
+    _sheetSlideAnim = Tween<Offset>(
+      begin: const Offset(0, 0.06),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _ctrl,
+      curve: const Interval(0.2, 1.0, curve: Curves.easeOutCubic),
+    ));
   }
 
   @override
   void dispose() {
-    _fadeCtrl.dispose();
+    _ctrl.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -63,129 +82,196 @@ class _LoginScreenState extends State<LoginScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Stack(
-        children: [
-          _buildBackground(),
-          SafeArea(
-            child: FadeTransition(
-              opacity: _fadeAnim,
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _buildHero(),
-                      const SizedBox(height: 40),
-                      if (_errorMessage != null) ...[
-                        _buildErrorBanner(),
-                        const SizedBox(height: 20),
-                      ],
-                      _buildFormCard(),
-                      const SizedBox(height: 28),
-                      _buildSubmitButton(),
-                      const SizedBox(height: 32),
-                      _buildFooter(),
-                    ],
+    final topPad = MediaQuery.of(context).padding.top;
+    final bottomPad = MediaQuery.of(context).padding.bottom;
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: Scaffold(
+        backgroundColor: AppColors.primaryDark,
+        body: Column(
+          children: [
+            // ── Header gradient ───────────────────────────────────────────────
+            FadeTransition(
+              opacity: _headerAnim,
+              child: Container(
+                width: double.infinity,
+                decoration: const BoxDecoration(gradient: AppTheme.primaryGradient),
+                padding: EdgeInsets.fromLTRB(28, topPad + 44, 28, 52),
+                child: _buildHero(),
+              ),
+            ),
+            // ── Sheet blanc ───────────────────────────────────────────────────
+            Expanded(
+              child: SlideTransition(
+                position: _sheetSlideAnim,
+                child: FadeTransition(
+                  opacity: _sheetFadeAnim,
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      color: AppColors.background,
+                      borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+                    ),
+                    child: SingleChildScrollView(
+                      padding: EdgeInsets.fromLTRB(24, 32, 24, bottomPad + 24),
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text("Connectez-vous", style: AppTextStyles.h3),
+                            const SizedBox(height: 4),
+                            Text(
+                              "Entrez vos identifiants pour continuer",
+                              style: AppTextStyles.bodySm,
+                            ),
+                            const SizedBox(height: 28),
+                            if (_errorMessage != null) ...[
+                              _buildErrorBanner(),
+                              const SizedBox(height: 20),
+                            ],
+                            _fieldLabel("ADRESSE EMAIL"),
+                            TextFormField(
+                              controller: _emailController,
+                              keyboardType: TextInputType.emailAddress,
+                              textInputAction: TextInputAction.next,
+                              autocorrect: false,
+                              style: AppTextStyles.body
+                                  .copyWith(fontWeight: FontWeight.w500),
+                              decoration: const InputDecoration(
+                                hintText: "chauffeur@geoconsulting.com",
+                                prefixIcon: Icon(Icons.email_outlined),
+                              ),
+                              validator: (v) => (v ?? '').isEmpty
+                                  ? "Veuillez entrer votre email"
+                                  : null,
+                            ),
+                            const SizedBox(height: 20),
+                            _fieldLabel("MOT DE PASSE"),
+                            TextFormField(
+                              controller: _passwordController,
+                              obscureText: _obscurePassword,
+                              textInputAction: TextInputAction.done,
+                              onFieldSubmitted: (_) => _handleLogin(),
+                              style: AppTextStyles.body
+                                  .copyWith(fontWeight: FontWeight.w500),
+                              decoration: InputDecoration(
+                                hintText: "••••••••",
+                                prefixIcon:
+                                    const Icon(Icons.lock_outline_rounded),
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    _obscurePassword
+                                        ? Icons.visibility_off_outlined
+                                        : Icons.visibility_outlined,
+                                    size: 20,
+                                  ),
+                                  color: AppColors.textSecondary,
+                                  onPressed: () => setState(
+                                      () => _obscurePassword = !_obscurePassword),
+                                ),
+                              ),
+                              validator: (v) => (v ?? '').length < 6
+                                  ? "Minimum 6 caractères"
+                                  : null,
+                            ),
+                            const SizedBox(height: 4),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton(
+                                onPressed: () => Navigator.push(
+                                  context,
+                                  AppTransitions.slideRight(
+                                      const ForgotPasswordScreen()),
+                                ),
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 4, vertical: 4),
+                                ),
+                                child: Text(
+                                  "Mot de passe oublié ?",
+                                  style: AppTextStyles.labelSm.copyWith(
+                                    color: AppColors.primary,
+                                    letterSpacing: 0.2,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            _buildSubmitButton(),
+                            const SizedBox(height: 28),
+                            _buildFooter(),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  // ── Background décoration ─────────────────────────────────────────────────
-  Widget _buildBackground() {
-    return Stack(
-      children: [
-        Positioned(
-          top: -80,
-          left: -80,
-          child: Container(
-            width: 260,
-            height: 260,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: AppColors.primary.withValues(alpha: 0.06),
-            ),
-          ),
-        ),
-        Positioned(
-          top: 80,
-          right: -60,
-          child: Container(
-            width: 160,
-            height: 160,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: AppColors.accent.withValues(alpha: 0.07),
-            ),
-          ),
-        ),
-        Positioned(
-          bottom: -60,
-          right: -40,
-          child: Container(
-            width: 200,
-            height: 200,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: AppColors.primary.withValues(alpha: 0.04),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ── Hero section ──────────────────────────────────────────────────────────
+  // ── Hero (sur le header gradient) ─────────────────────────────────────────
   Widget _buildHero() {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          width: 80,
-          height: 80,
+          width: 64,
+          height: 64,
           decoration: BoxDecoration(
-            gradient: AppTheme.primaryGradient,
-            borderRadius: AppSpacing.roundedXl,
-            boxShadow: AppTheme.shadowColored(AppColors.primary),
+            color: Colors.white.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.3),
+              width: 1.5,
+            ),
           ),
           child: Center(
             child: Image.asset(
               'assets/images/logo_geoconsulting.png',
-              width: 40,
-              height: 40,
+              width: 36,
+              height: 36,
               fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) => const Icon(
+              errorBuilder: (context, error, _) => const Icon(
                 Icons.local_shipping_rounded,
                 color: Colors.white,
-                size: 40,
+                size: 34,
               ),
             ),
           ),
         ),
-        const SizedBox(height: 24),
-        Text("Geoconsulting", style: AppTextStyles.h1),
+        const SizedBox(height: 20),
+        const Text(
+          "Geoconsulting",
+          style: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 28,
+            fontWeight: FontWeight.w800,
+            color: Colors.white,
+            letterSpacing: -0.5,
+          ),
+        ),
         const SizedBox(height: 6),
         Text(
           "Espace Chauffeur",
-          style: AppTextStyles.bodySm.copyWith(
-            letterSpacing: 1.5,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textSecondary,
+          style: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Colors.white.withValues(alpha: 0.75),
+            letterSpacing: 1.2,
           ),
         ),
       ],
     );
   }
 
-  // ── Error banner ──────────────────────────────────────────────────────────
+  // ── Bannière d'erreur ──────────────────────────────────────────────────────
   Widget _buildErrorBanner() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -207,153 +293,51 @@ class _LoginScreenState extends State<LoginScreen>
           ),
           GestureDetector(
             onTap: () => setState(() => _errorMessage = null),
-            child: const Icon(Icons.close_rounded,
-                color: AppColors.error, size: 18),
+            child:
+                const Icon(Icons.close_rounded, color: AppColors.error, size: 18),
           ),
         ],
       ),
     );
   }
 
-  // ── Form card ─────────────────────────────────────────────────────────────
-  Widget _buildFormCard() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: AppSpacing.roundedXl,
-        border: Border.all(color: AppColors.borderLight),
-        boxShadow: AppTheme.shadowMd,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text("Se connecter", style: AppTextStyles.h4),
-          const SizedBox(height: 4),
-          Text("Entrez vos identifiants pour continuer",
-              style: AppTextStyles.bodySm),
-          const SizedBox(height: 28),
-
-          // Email
-          _fieldLabel("ADRESSE EMAIL"),
-          TextFormField(
-            controller: _emailController,
-            keyboardType: TextInputType.emailAddress,
-            textInputAction: TextInputAction.next,
-            autocorrect: false,
-            style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w500),
-            decoration: const InputDecoration(
-              hintText: "chauffeur@geoconsulting.com",
-              prefixIcon: Icon(Icons.email_outlined),
-            ),
-            validator: (v) =>
-                (v ?? '').isEmpty ? "Veuillez entrer votre email" : null,
-          ),
-          const SizedBox(height: 20),
-
-          // Password
-          _fieldLabel("MOT DE PASSE"),
-          TextFormField(
-            controller: _passwordController,
-            obscureText: _obscurePassword,
-            textInputAction: TextInputAction.done,
-            onFieldSubmitted: (_) => _handleLogin(),
-            style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w500),
-            decoration: InputDecoration(
-              hintText: "••••••••",
-              prefixIcon: const Icon(Icons.lock_outline_rounded),
-              suffixIcon: IconButton(
-                icon: Icon(
-                  _obscurePassword
-                      ? Icons.visibility_off_outlined
-                      : Icons.visibility_outlined,
-                  size: 20,
-                ),
-                color: AppColors.textSecondary,
-                onPressed: () =>
-                    setState(() => _obscurePassword = !_obscurePassword),
-              ),
-            ),
-            validator: (v) =>
-                (v ?? '').length < 6 ? "Minimum 6 caractères" : null,
-          ),
-          const SizedBox(height: 4),
-
-          // Forgot password
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (_) => const ForgotPasswordScreen()),
-              ),
-              style: TextButton.styleFrom(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-              ),
-              child: Text(
-                "Mot de passe oublié ?",
-                style: AppTextStyles.labelSm.copyWith(
-                  color: AppColors.primary,
-                  letterSpacing: 0.2,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── Submit button ─────────────────────────────────────────────────────────
+  // ── Bouton de connexion ────────────────────────────────────────────────────
   Widget _buildSubmitButton() {
-    if (_isLoading) {
-      return Container(
-        height: 54,
-        decoration: BoxDecoration(
-          gradient: AppTheme.primaryGradient,
-          borderRadius: AppSpacing.roundedLg,
-        ),
-        child: const Center(
-          child: SizedBox(
-            width: 22,
-            height: 22,
-            child: CircularProgressIndicator(
-              color: Colors.white,
-              strokeWidth: 2.5,
-            ),
-          ),
-        ),
-      );
-    }
-
     return Container(
       height: 54,
       decoration: BoxDecoration(
-        gradient: AppTheme.primaryGradient,
+        gradient: _isLoading ? null : AppTheme.primaryGradient,
+        color: _isLoading ? AppColors.primary : null,
         borderRadius: AppSpacing.roundedLg,
-        boxShadow: AppTheme.shadowColored(AppColors.primary),
+        boxShadow: _isLoading ? null : AppTheme.shadowColored(AppColors.primary),
       ),
       child: ElevatedButton(
-        onPressed: _handleLogin,
+        onPressed: _isLoading ? null : _handleLogin,
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.transparent,
+          disabledBackgroundColor: Colors.transparent,
           shadowColor: Colors.transparent,
           shape: RoundedRectangleBorder(borderRadius: AppSpacing.roundedLg),
         ),
-        child: Text(
-          "SE CONNECTER",
-          style: AppTextStyles.btnLg.copyWith(
-            color: Colors.white,
-            letterSpacing: 1,
-          ),
-        ),
+        child: _isLoading
+            ? const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(
+                    color: Colors.white, strokeWidth: 2.5),
+              )
+            : Text(
+                "SE CONNECTER",
+                style: AppTextStyles.btnLg.copyWith(
+                  color: Colors.white,
+                  letterSpacing: 1,
+                ),
+              ),
       ),
     );
   }
 
-  // ── Footer ────────────────────────────────────────────────────────────────
+  // ── Footer ─────────────────────────────────────────────────────────────────
   Widget _buildFooter() {
     return Column(
       children: [
@@ -364,12 +348,11 @@ class _LoginScreenState extends State<LoginScreen>
             TextButton(
               onPressed: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const RegisterScreen()),
+                AppTransitions.slideRight(const RegisterScreen()),
               ),
               child: Text(
                 "Créer un compte",
-                style: AppTextStyles.label
-                    .copyWith(color: AppColors.primary),
+                style: AppTextStyles.label.copyWith(color: AppColors.primary),
               ),
             ),
           ],
@@ -384,7 +367,7 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  // ── Field label helper ────────────────────────────────────────────────────
+  // ── Label de champ ─────────────────────────────────────────────────────────
   Widget _fieldLabel(String text) {
     return Padding(
       padding: const EdgeInsets.only(left: 4, bottom: 8),

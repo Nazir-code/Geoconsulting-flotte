@@ -8,17 +8,17 @@ import 'package:geolocator/geolocator.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
 import '../services/new_location_service.dart';
+import '../theme/app_transitions.dart';
 import '../services/gps_lifecycle_manager.dart';
 import '../services/firebase_notification_service.dart';
 import '../models/driver_profile.dart';
 import '../widgets/kpi_card.dart';
+import '../widgets/ds_shimmer.dart';
 import '../widgets/status_switch.dart';
 import '../widgets/vehicle_status_card.dart';
 import '../widgets/quick_action_button.dart';
 import '../widgets/mission_card_pro.dart';
 import 'tracking_screen.dart';
-import 'fuel_entry_screen.dart';
-import 'maintenance_request_screen.dart';
 import '../theme/app_theme.dart';
 
 class DriverHome extends StatefulWidget {
@@ -49,19 +49,16 @@ class _DriverHomeState extends State<DriverHome> {
   final Set<String> _knownMissionIds = {};
   bool _isFirstMissionSnapshot = true;
 
-  // Stream des missions récentes, créé une seule fois et caché pour éviter
-  // les re-souscriptions à chaque setState GPS/boussole. Initialisé en lazy
-  // via _ensureMissionsStream() dès que l'uid est disponible (robuste au
-  // démarrage où l'auth peut ne pas être encore restaurée au 1er frame).
-  Stream<QuerySnapshot>? _recentMissionsStream;
+  late final Stream<QuerySnapshot> _missionsTodayStream;
+  late final Stream<QuerySnapshot> _missionsDoneStream;
 
   @override
   void initState() {
     super.initState();
+    _initKpiStreams();
     _loadProfile();
     _startMissionNotifications();
     _initMissionListener();
-    _ensureMissionsStream(); // init au plus tôt ; fallback lazy dans build()
 
     GpsLifecycleManager().onPermissionDenied = () {
       if (!mounted) return;
@@ -76,9 +73,6 @@ class _DriverHomeState extends State<DriverHome> {
     _gpsSubscription = NewLocationService().positionStream.listen((pos) {
       if (mounted) {
         setState(() => _currentLocation = LatLng(pos.latitude, pos.longitude));
-        if (pos.speed > 0.5 && pos.heading >= 0) {
-          _applyCompassHeading(pos.heading);
-        }
       }
     });
 
@@ -114,6 +108,26 @@ class _DriverHomeState extends State<DriverHome> {
     setState(() => _headingTurns += delta / 360.0);
   }
 
+  void _initKpiStreams() {
+    final uid = _authService.currentUid ?? '';
+    final today = DateTime.now();
+    final startOfDay = Timestamp.fromDate(
+      DateTime(today.year, today.month, today.day),
+    );
+
+    _missionsTodayStream = FirebaseFirestore.instance
+        .collection('missions')
+        .where('assignedTo', isEqualTo: uid)
+        .where('createdAt', isGreaterThanOrEqualTo: startOfDay)
+        .snapshots();
+
+    _missionsDoneStream = FirebaseFirestore.instance
+        .collection('missions')
+        .where('assignedTo', isEqualTo: uid)
+        .where('status', whereIn: ['completed', 'terminée'])
+        .snapshots();
+  }
+
   Future<void> _loadProfile() async {
     final uid = _authService.currentUid;
     if (uid != null) {
@@ -127,7 +141,6 @@ class _DriverHomeState extends State<DriverHome> {
       });
     }
   }
-
 
   void _initMissionListener() {
     final uid = _authService.currentUid;
@@ -190,6 +203,10 @@ class _DriverHomeState extends State<DriverHome> {
     );
   }
 
+  Future<void> _refreshHome() async {
+    await _loadProfile();
+  }
+
   void _toggleStatus(bool online) async {
     setState(() => _isOnline = online);
     await GpsLifecycleManager().setDriverOnline(online);
@@ -206,20 +223,30 @@ class _DriverHomeState extends State<DriverHome> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
       body: SafeArea(
-        child: CustomScrollView(
-          physics: const BouncingScrollPhysics(),
-          slivers: [
-            _buildTopBar(),
-            _buildKpiSection(),
-            _buildVehicleSection(),
-            _buildQuickActions(),
-            _buildMapPreview(),
-            _buildRecentMissionsHeader(),
-            _buildRecentMissionsList(),
-            const SliverToBoxAdapter(child: SizedBox(height: 100)),
-          ],
+        child: DsShimmer(
+          child: RefreshIndicator(
+            onRefresh: _refreshHome,
+            color: AppColors.primary,
+            backgroundColor: AppColors.surface,
+            strokeWidth: 2.5,
+            displacement: 60,
+            child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(
+                parent: BouncingScrollPhysics(),
+              ),
+              slivers: [
+                _buildTopBar(),
+                _buildKpiSection(),
+                _buildVehicleSection(),
+                _buildQuickActions(),
+                _buildMapPreview(),
+                _buildRecentMissionsHeader(),
+                _buildRecentMissionsList(),
+                const SliverToBoxAdapter(child: SizedBox(height: 100)),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -287,19 +314,36 @@ class _DriverHomeState extends State<DriverHome> {
         mainAxisSpacing: 12,
         crossAxisSpacing: 12,
         childAspectRatio: 1.1,
-        children: const [
-          KpiCard(
-            title: "Missions / Jour",
-            value: "08",
-            icon: Icons.route_rounded,
-            trend: "+12%",
+        children: [
+          StreamBuilder<QuerySnapshot>(
+            stream: _missionsTodayStream,
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) return const KpiCardSkeleton();
+              final count = snapshot.data!.docs.length;
+              return KpiCard(
+                title: "Missions / Jour",
+                value: count.toString().padLeft(2, '0'),
+                icon: Icons.route_rounded,
+                subtitle: count == 0 ? 'Aucune' : 'Aujourd\'hui',
+                subtitleColor:
+                    count > 0 ? AppColors.primary : AppColors.textSecondary,
+              );
+            },
           ),
-          KpiCard(
-            title: "KM Parcourus",
-            value: "1 240",
-            icon: Icons.speed_rounded,
-            iconColor: AppColors.warning,
-            trend: "+5%",
+          StreamBuilder<QuerySnapshot>(
+            stream: _missionsDoneStream,
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) return const KpiCardSkeleton();
+              final count = snapshot.data!.docs.length;
+              return KpiCard(
+                title: "Terminées",
+                value: count.toString(),
+                icon: Icons.check_circle_outline_rounded,
+                iconColor: AppColors.success,
+                subtitle: 'Au total',
+                subtitleColor: AppColors.success,
+              );
+            },
           ),
         ],
       ),
@@ -342,30 +386,20 @@ class _DriverHomeState extends State<DriverHome> {
               color: AppColors.accent,
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const TrackingScreen()),
+                AppTransitions.slideUp(const TrackingScreen()),
               ),
             ),
             QuickActionButton(
-              icon: Icons.local_gas_station_rounded,
-              label: "Carburant",
+              icon: Icons.history_rounded,
+              label: "Historique",
               color: const Color(0xFF8B5CF6),
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => FuelEntryScreen(driverName: _profile?.name),
-                ),
-              ),
+              onTap: () {},
             ),
             QuickActionButton(
-              icon: Icons.build_rounded,
-              label: "Entretien",
+              icon: Icons.qr_code_scanner_rounded,
+              label: "Scanner",
               color: AppColors.warning,
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => MaintenanceRequestScreen(driverName: _profile?.name),
-                ),
-              ),
+              onTap: () {},
             ),
           ],
         ),
@@ -469,7 +503,7 @@ class _DriverHomeState extends State<DriverHome> {
                   GestureDetector(
                     onTap: () => Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const TrackingScreen()),
+                      AppTransitions.slideUp(const TrackingScreen()),
                     ),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -523,84 +557,31 @@ class _DriverHomeState extends State<DriverHome> {
     );
   }
 
-  // Crée le stream des missions une seule fois, dès que l'uid est disponible.
-  // Idempotent : appelé à chaque build, il réessaie tant que l'uid est null
-  // (les rebuilds GPS ~1×/s garantissent la création dès que l'auth est prête).
-  // Requête simple (where assignedTo) sans orderBy → aucun index composite
-  // requis ; le tri "récent" se fait côté client.
-  void _ensureMissionsStream() {
-    if (_recentMissionsStream != null) return;
-    final uid = _authService.currentUid;
-    if (uid == null) return;
-    _recentMissionsStream = FirebaseFirestore.instance
-        .collection('missions')
-        .where('assignedTo', isEqualTo: uid)
-        .snapshots();
-  }
-
   Widget _buildRecentMissionsList() {
-    _ensureMissionsStream();
-
-    if (_recentMissionsStream == null) {
-      // uid pas encore prêt — spinner transitoire, le prochain rebuild réessaie
-      return const SliverToBoxAdapter(
-        child: Padding(
-          padding: EdgeInsets.all(20),
-          child: Center(
-            child: CircularProgressIndicator(
-              color: AppColors.primary,
-              strokeWidth: 2,
-            ),
-          ),
-        ),
-      );
-    }
-
     return StreamBuilder<QuerySnapshot>(
-      stream: _recentMissionsStream,
+      stream: FirebaseFirestore.instance
+          .collection('missions')
+          .where('assignedTo', isEqualTo: _authService.currentUid)
+          .limit(3)
+          .snapshots(),
       builder: (context, snapshot) {
-        if (snapshot.hasError) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate(const [
+                MissionCardSkeleton(),
+                MissionCardSkeleton(),
+                MissionCardSkeleton(),
+              ]),
+            ),
+          );
+        }
+
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
           return SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              child: Text(
-                'Erreur de chargement : ${snapshot.error}',
-                style: const TextStyle(color: AppColors.error),
-              ),
-            ),
+            child: _buildEmptyMissions(),
           );
-        }
-
-        if (!snapshot.hasData) {
-          return const SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.all(20),
-              child: Center(
-                child: CircularProgressIndicator(
-                  color: AppColors.primary,
-                  strokeWidth: 2,
-                ),
-              ),
-            ),
-          );
-        }
-
-        // Tri côté client par createdAt décroissant, puis 3 plus récentes.
-        // Gère les docs sans createdAt (placés en fin) — évite l'exclusion
-        // silencieuse qu'aurait provoquée un orderBy('createdAt') serveur.
-        final docs = snapshot.data!.docs.toList()
-          ..sort((a, b) {
-            final ta = (a.data() as Map<String, dynamic>)['createdAt'];
-            final tb = (b.data() as Map<String, dynamic>)['createdAt'];
-            if (ta is Timestamp && tb is Timestamp) return tb.compareTo(ta);
-            if (ta is Timestamp) return -1;
-            if (tb is Timestamp) return 1;
-            return 0;
-          });
-        final recent = docs.take(3).toList();
-
-        if (recent.isEmpty) {
-          return SliverToBoxAdapter(child: _buildEmptyMissions());
         }
 
         return SliverPadding(
@@ -608,14 +589,14 @@ class _DriverHomeState extends State<DriverHome> {
           sliver: SliverList(
             delegate: SliverChildBuilderDelegate(
               (context, index) {
-                final doc = recent[index];
+                final doc = snapshot.data!.docs[index];
                 final data = {
                   'id': doc.id,
                   ...(doc.data() as Map<String, dynamic>),
                 };
                 return MissionCardPro(mission: data);
               },
-              childCount: recent.length,
+              childCount: snapshot.data!.docs.length,
             ),
           ),
         );
@@ -624,21 +605,22 @@ class _DriverHomeState extends State<DriverHome> {
   }
 
   Widget _buildEmptyMissions() {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 28),
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: cs.surface,
           borderRadius: AppSpacing.roundedLg,
-          border: Border.all(color: AppColors.borderLight),
+          border: Border.all(color: cs.outlineVariant),
         ),
         child: Column(
           children: [
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: AppColors.surfaceVariant,
+                color: cs.surfaceContainerHighest,
                 shape: BoxShape.circle,
               ),
               child: const Icon(
@@ -809,7 +791,7 @@ class _DriverHomeState extends State<DriverHome> {
       Navigator.pop(context);
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const TrackingScreen()),
+        AppTransitions.slideUp(const TrackingScreen()),
       );
     } catch (error) {
       if (!mounted) return;

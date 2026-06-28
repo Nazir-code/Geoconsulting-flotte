@@ -25,7 +25,6 @@ create-test-mission-fcm.js
 diagnostic-complete.js
 diagnostic-notifications.js
 fix-firebase-uid-sync.js
-fix-notification-service.js
 interactive-guide.js
 setup-test-driver.js
 test-enhanced-endpoint-integration.js

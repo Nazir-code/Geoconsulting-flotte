@@ -13,32 +13,35 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
 
-// Icône véhicule circulaire avec flèche directionnelle — tourne selon le heading
-function createVehicleIcon(plateNumber: string, heading: number) {
+// Icône véhicule = pin de localisation (identique à MapPanel pour cohérence).
+// Marqueur statique : pas de rotation selon le cap GPS.
+function createVehicleIcon(plateNumber: string) {
   const color = '#0E7490';
   const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 44 44">
+    <svg xmlns="http://www.w3.org/2000/svg" width="44" height="52" viewBox="0 0 44 52">
       <defs>
-        <filter id="vshadow" x="-30%" y="-30%" width="160%" height="160%">
-          <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="rgba(0,0,0,0.35)"/>
+        <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="rgba(0,0,0,0.3)"/>
         </filter>
       </defs>
-      <!-- Halo externe -->
-      <circle cx="22" cy="22" r="21" fill="${color}" opacity="0.18"/>
-      <!-- Cercle principal -->
-      <circle cx="22" cy="22" r="17" fill="${color}" filter="url(#vshadow)"/>
-      <!-- Cercle intérieur blanc -->
+      <!-- Corps du pin -->
+      <path d="M22 2 C11 2 2 11 2 22 C2 33 22 50 22 50 C22 50 42 33 42 22 C42 11 33 2 22 2 Z"
+            fill="${color}" filter="url(#shadow)"/>
+      <!-- Cercle intérieur -->
       <circle cx="22" cy="22" r="12" fill="white"/>
-      <!-- Flèche de navigation (pointe vers le Nord = haut) -->
-      <path d="M22 9 L27.5 29 L22 25 L16.5 29 Z" fill="${color}"/>
+      <!-- Pictogramme véhicule -->
+      <rect x="14" y="18" width="16" height="8" rx="2" fill="${color}" opacity="0.95"/>
+      <rect x="17" y="15" width="10" height="4" rx="1.5" fill="${color}" opacity="0.75"/>
+      <circle cx="17" cy="27" r="1.8" fill="${color}" />
+      <circle cx="27" cy="27" r="1.8" fill="${color}" />
     </svg>
   `;
   return L.divIcon({
-    html: `<div title="${plateNumber}" style="transform:rotate(${heading}deg);transform-origin:center center;width:44px;height:44px;">${svg}</div>`,
+    html: `<div title="${plateNumber}">${svg}</div>`,
     className: '',
-    iconSize: [44, 44],
-    iconAnchor: [22, 22],
-    popupAnchor: [0, -26],
+    iconSize: [44, 52],
+    iconAnchor: [22, 52],
+    popupAnchor: [0, -52],
   });
 }
 
@@ -128,7 +131,7 @@ export function LiveMap({ positions, trails, missions, selectedVehicleId, onMark
           <Marker
             key={`marker-${pos.vehicleId}`}
             position={[pos.lat, pos.lng]}
-            icon={createVehicleIcon(plate, pos.heading)}
+            icon={createVehicleIcon(plate)}
             eventHandlers={{
               click: () => onMarkerClick?.(pos.vehicleId),
             }}

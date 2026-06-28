@@ -38,6 +38,8 @@ export interface Vehicle {
   consumptionTheoretical?: number; // L/100km
   fuelCapacity?: number; // Litres
   kmAtLastService?: number; // Kilométrage dernier service
+  insuranceExpiry?: string;             // Date expiration assurance (ISO)
+  technicalInspectionExpiry?: string;   // Date expiration contrôle technique (ISO)
   createdAt: string;
   updatedAt: string;
 }
@@ -50,6 +52,8 @@ export interface Driver {
   licenseNumber: string;
   licenseExpiry: string;
   status: 'active' | 'on_mission' | 'off' | 'suspended';
+  // Validation d'inscription : absent = approuvé (chauffeurs historiques non bloqués).
+  approvalStatus?: 'pending' | 'approved' | 'rejected';
   rating: number;
   totalMissions: number;
   currentVehicleId?: string;
@@ -138,6 +142,8 @@ export interface Alert {
   id: string;
   vehicleId: string;
   vehicle?: Vehicle;
+  vehiclePlate?: string;   // dénormalisé pour affichage sans join
+  vehicleModel?: string;   // dénormalisé pour affichage sans join
   type: AlertType;
   severity: AlertSeverity;
   title: string;

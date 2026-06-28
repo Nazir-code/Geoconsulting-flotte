@@ -9,6 +9,10 @@ interface KPICardProps {
   change?: number;
   changeLabel?: string;
   icon: LucideIcon;
+  /** Si fournie, une vraie image remplace l'icône SVG (ex. photo véhicule). */
+  image?: string;
+  /** Si fourni, la carte devient cliquable (raccourci vers une section). */
+  onClick?: () => void;
   color: 'cyan' | 'violet' | 'lime' | 'orange';
   delay?: number;
 }
@@ -51,6 +55,8 @@ export function KPICard({
   change,
   changeLabel,
   icon: Icon,
+  image,
+  onClick,
   color,
   delay = 0,
 }: KPICardProps) {
@@ -69,7 +75,21 @@ export function KPICard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay, duration: 0.5 }}
       whileHover={{ y: -4, transition: { duration: 0.2 } }}
-      className="kpi-card relative"
+      whileTap={onClick ? { scale: 0.98 } : undefined}
+      onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={
+        onClick
+          ? (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onClick();
+              }
+            }
+          : undefined
+      }
+      className={`kpi-card relative ${onClick ? 'cursor-pointer' : ''}`}
     >
       {/* Accent gradient léger (coin supérieur) */}
       <div
@@ -80,9 +100,15 @@ export function KPICard({
 
       <div className="relative">
         <div className="flex items-start justify-between mb-4">
-          <div className={`w-10 h-10 rounded-xl ${colors.bg} flex items-center justify-center`}>
-            <Icon className={`w-5 h-5 ${colors.text}`} strokeWidth={1.5} />
-          </div>
+          {image ? (
+            <div className="w-24 h-20 flex items-center justify-center">
+              <img src={image} alt={title} className="w-full h-full object-contain drop-shadow-md" />
+            </div>
+          ) : (
+            <div className={`w-11 h-11 rounded-2xl ${colors.bg} flex items-center justify-center`}>
+              <Icon className={`w-[22px] h-[22px] ${colors.text}`} strokeWidth={1.5} />
+            </div>
+          )}
           {change !== undefined && (
             <div
               className={`flex items-center gap-1 text-xs font-medium ${
@@ -99,8 +125,8 @@ export function KPICard({
           )}
         </div>
 
-        <p className="text-text-secondary text-sm mb-1">{title}</p>
-        <h3 className="text-2xl font-display font-bold text-text-primary truncate-text">
+        <p className="text-text-secondary text-[11px] font-medium uppercase tracking-wider mb-1.5">{title}</p>
+        <h3 className="text-3xl font-display font-bold tracking-tight text-text-primary truncate-text">
           {formatValue(value)}
         </h3>
         {changeLabel && (

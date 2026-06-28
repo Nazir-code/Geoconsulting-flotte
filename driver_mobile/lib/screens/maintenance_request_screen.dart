@@ -104,11 +104,11 @@ class _MaintenanceRequestScreenState extends State<MaintenanceRequestScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: context.palette.background,
       appBar: AppBar(
         title: const Text('Signaler un entretien'),
-        backgroundColor: AppColors.surface,
-        foregroundColor: AppColors.textHeading,
+        backgroundColor: context.palette.surface,
+        foregroundColor: context.palette.textHeading,
         elevation: 0,
       ),
       body: _loadingVehicles
@@ -135,10 +135,10 @@ class _MaintenanceRequestScreenState extends State<MaintenanceRequestScreen> {
                     onChanged: (val) => setState(() => _selectedVehicleId = val),
                   ),
                   if (_vehicles.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 6),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
                       child: Text('Aucun véhicule disponible.',
-                          style: TextStyle(color: AppColors.error, fontSize: 12)),
+                          style: AppTextStyles.caption.copyWith(color: AppColors.error)),
                     ),
                   const SizedBox(height: 16),
                   _label("Type d'entretien"),
@@ -179,8 +179,8 @@ class _MaintenanceRequestScreenState extends State<MaintenanceRequestScreen> {
                           ? const SizedBox(
                               width: 20, height: 20,
                               child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                          : const Text('Envoyer la demande',
-                              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                          : Text('Envoyer la demande',
+                              style: AppTextStyles.btnLg.copyWith(fontSize: 15, letterSpacing: 0)),
                     ),
                   ),
                 ],
@@ -192,22 +192,21 @@ class _MaintenanceRequestScreenState extends State<MaintenanceRequestScreen> {
   Widget _label(String text) => Padding(
         padding: const EdgeInsets.only(bottom: 6),
         child: Text(text,
-            style: const TextStyle(
-                color: AppColors.textSecondary, fontSize: 13, fontWeight: FontWeight.w600)),
+            style: AppTextStyles.label.copyWith(color: AppColors.textSecondary)),
       );
 
   InputDecoration _dec(String hint) => InputDecoration(
         hintText: hint,
         filled: true,
-        fillColor: AppColors.surface,
+        fillColor: context.palette.surface,
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         border: OutlineInputBorder(
           borderRadius: AppSpacing.roundedMd,
-          borderSide: const BorderSide(color: AppColors.border),
+          borderSide: BorderSide(color: context.palette.border),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: AppSpacing.roundedMd,
-          borderSide: const BorderSide(color: AppColors.border),
+          borderSide: BorderSide(color: context.palette.border),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: AppSpacing.roundedMd,

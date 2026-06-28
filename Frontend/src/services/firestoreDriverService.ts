@@ -12,9 +12,12 @@ export interface Driver {
   role?: 'driver' | 'manager' | 'admin';
   phone?: string;
   status: 'online' | 'offline';
+  // Validation d'inscription : absent = approuvé (chauffeurs historiques non bloqués).
+  approvalStatus?: 'pending' | 'approved' | 'rejected';
   latitude?: number;
   longitude?: number;
   heading?: number;
+  speed?: number; // km/h, écrit par le mobile dans drivers/{uid}
   lastLocationUpdate?: Timestamp;
   lastSeen: Timestamp;
   currentMission?: string;
@@ -62,6 +65,20 @@ export class FirestoreDriverService {
     await FirestoreService.updateDocument(driverPath, {
       status,
       lastSeen: FirestoreService.getServerTimestamp(),
+      updatedAt: FirestoreService.getServerTimestamp(),
+    });
+  }
+
+  /**
+   * Approuver / refuser l'inscription d'un chauffeur (réservé au gestionnaire).
+   */
+  static async setApprovalStatus(
+    uid: string,
+    approvalStatus: 'approved' | 'rejected' | 'pending'
+  ): Promise<void> {
+    const driverPath = `${this.DRIVERS_COLLECTION}/${uid}`;
+    await FirestoreService.updateDocument(driverPath, {
+      approvalStatus,
       updatedAt: FirestoreService.getServerTimestamp(),
     });
   }

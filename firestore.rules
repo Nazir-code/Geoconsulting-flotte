@@ -25,11 +25,27 @@ service cloud.firestore {
     match /drivers/{driverId} {
       allow read: if isAuthenticated();
 
-      // Un chauffeur peut mettre à jour ses données GPS et son statut
-      allow update: if isAuthenticated() && (isOwner(driverId) || isManager());
+      // Mise à jour :
+      //  - le manager peut tout modifier (dont approvalStatus = approuver/refuser) ;
+      //  - le chauffeur peut MAJ ses données (GPS, statut…) MAIS PAS son propre
+      //    approvalStatus (anti auto-approbation).
+      allow update: if isAuthenticated() && (
+        isManager() ||
+        (isOwner(driverId) &&
+         request.resource.data.get('approvalStatus', null) == resource.data.get('approvalStatus', null))
+      );
 
-      // Seuls les managers peuvent créer ou supprimer des profils (via l'app web)
-      allow create, delete: if isAuthenticated() && isManager();
+      // Création :
+      //  - le manager peut créer n'importe quel profil ;
+      //  - le chauffeur ne peut créer QUE son propre profil, et UNIQUEMENT en
+      //    'pending' (il ne peut pas s'inscrire déjà approuvé).
+      allow create: if isAuthenticated() && (
+        isManager() ||
+        (isOwner(driverId) && request.resource.data.get('approvalStatus', 'pending') == 'pending')
+      );
+
+      // Suppression réservée aux managers.
+      allow delete: if isAuthenticated() && isManager();
 
       // Sous-collection : historique GPS — écrit uniquement par le chauffeur propriétaire
       match /location_history/{historyId} {
@@ -40,8 +56,13 @@ service cloud.firestore {
 
     // Collection: Missions
     match /missions/{missionId} {
-      // Lecture autorisée pour le chauffeur assigné ou les managers
-      allow read: if isAuthenticated() && (resource.data.assignedTo == request.auth.uid || isManager());
+      // Lecture autorisée pour le chauffeur assigné ou les managers.
+      // `resource == null` tolère la lecture d'une mission inexistante
+      // (supprimée entre-temps) : sans ça, l'évaluation de `resource.data`
+      // sur un doc null plante et renvoie permission-denied au lieu de
+      // « introuvable », ce qui bloque le chauffeur s'il référence encore
+      // une mission supprimée (champ drivers/{uid}.currentMission obsolète).
+      allow read: if isAuthenticated() && (resource == null || resource.data.assignedTo == request.auth.uid || isManager());
 
       // Un chauffeur peut mettre à jour le statut d'une mission qui lui est assignée
       allow update: if isAuthenticated() && (resource.data.assignedTo == request.auth.uid || isManager());
@@ -81,6 +102,13 @@ service cloud.firestore {
 
       // Résolution / suppression réservées aux managers
       allow update, delete: if isAuthenticated() && isManager();
+    }
+
+    // Collection: alerts (alertes véhicules générées par le tableau de bord)
+    match /alerts/{alertId} {
+      // Lecture, création, modification et suppression réservées aux managers/admins.
+      // Les alertes sont des données de gestion de flotte — non exposées aux chauffeurs.
+      allow read, create, update, delete: if isAuthenticated() && isManager();
     }
 
     // Sécurité par défaut : Refuser tout le reste

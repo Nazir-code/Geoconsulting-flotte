@@ -37,6 +37,8 @@ export function CreateVehicleForm({
     consumptionTheoretical: 0,
     fuelCapacity: 0,
     kmAtLastService: 0,
+    insuranceExpiry: '',
+    technicalInspectionExpiry: '',
   });
 
   useEffect(() => {
@@ -56,6 +58,8 @@ export function CreateVehicleForm({
         consumptionTheoretical: vehicle.consumptionTheoretical || 0,
         fuelCapacity: vehicle.fuelCapacity || 0,
         kmAtLastService: vehicle.kmAtLastService || 0,
+        insuranceExpiry: vehicle.insuranceExpiry?.split('T')[0] || '',
+        technicalInspectionExpiry: vehicle.technicalInspectionExpiry?.split('T')[0] || '',
       });
     }
   }, [vehicle]);
@@ -72,6 +76,12 @@ export function CreateVehicleForm({
           : undefined,
         nextMaintenanceDate: formData.nextMaintenanceDate
           ? new Date(formData.nextMaintenanceDate).toISOString()
+          : undefined,
+        insuranceExpiry: formData.insuranceExpiry
+          ? new Date(formData.insuranceExpiry).toISOString()
+          : undefined,
+        technicalInspectionExpiry: formData.technicalInspectionExpiry
+          ? new Date(formData.technicalInspectionExpiry).toISOString()
           : undefined,
       });
       onSuccess?.();
@@ -273,7 +283,29 @@ export function CreateVehicleForm({
           </div>
         </div>
 
-        {/* Row 6: Consumption & Fuel Capacity */}
+        {/* Row 6: Insurance & Inspection Expiry */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="form-group">
+            <label className="form-label">Expiration Assurance</label>
+            <input
+              type="date"
+              value={formData.insuranceExpiry}
+              onChange={(e) => setFormData({ ...formData, insuranceExpiry: e.target.value })}
+              className="input-field"
+            />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Contrôle Technique (expiration)</label>
+            <input
+              type="date"
+              value={formData.technicalInspectionExpiry}
+              onChange={(e) => setFormData({ ...formData, technicalInspectionExpiry: e.target.value })}
+              className="input-field"
+            />
+          </div>
+        </div>
+
+        {/* Row 7: Consumption & Fuel Capacity */}
         <div className="grid grid-cols-2 gap-4">
           <div className="form-group">
             <label className="form-label">Consommation Théorique (L/100km)</label>

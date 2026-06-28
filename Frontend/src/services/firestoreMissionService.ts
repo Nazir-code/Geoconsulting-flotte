@@ -2,8 +2,42 @@
 // Service Firestore pour la gestion des missions
 
 import { doc, runTransaction, serverTimestamp, where, Timestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebaseConfig';
+import { auth, db } from '@/lib/firebaseConfig';
 import FirestoreService from '@/lib/firestoreService';
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+
+/**
+ * Déclenche le push FCM "mission assignée" côté backend (Admin SDK).
+ * Fire-and-forget : une mission reste valide même si le push échoue
+ * (le chauffeur la voit via le listener Firestore temps réel).
+ * Remplace la Cloud Function notifyDriverOnMissionCreated (sans plan Blaze).
+ */
+export async function notifyMissionAssigned(missionId: string): Promise<void> {
+  try {
+    const token = await auth.currentUser?.getIdToken();
+    if (!token) {
+      console.warn('[notifyMissionAssigned] Aucun utilisateur Firebase connecté — push non déclenché.');
+      return;
+    }
+
+    const response = await fetch(`${API_BASE_URL}/notifications/mission-assigned`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ missionId }),
+    });
+
+    if (!response.ok) {
+      console.warn(`[notifyMissionAssigned] Backend a répondu ${response.status} pour mission ${missionId}.`);
+    }
+  } catch (error) {
+    // Best-effort : ne jamais faire échouer la création/assignation de mission.
+    console.warn('[notifyMissionAssigned] Échec déclenchement du push:', error);
+  }
+}
 
 export const MISSION_STATUSES = [
   'en_attente',
@@ -116,7 +150,14 @@ export class FirestoreMissionService {
     const missionPath = `${this.MISSIONS_COLLECTION}/${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     await FirestoreService.setDocument(missionPath, missionData);
 
-    return missionPath.split('/')[1];
+    const missionId = missionPath.split('/')[1];
+
+    // Si la mission est créée déjà assignée à un chauffeur, déclencher le push.
+    if (data.assignedTo) {
+      void notifyMissionAssigned(missionId);
+    }
+
+    return missionId;
   }
 
   /**
@@ -137,9 +178,13 @@ export class FirestoreMissionService {
       Object.assign(updateData, { status: toStorageStatus(data.status) });
     }
 
-    // Ajouter assignedAt si assignedTo est mis à jour
+    // Ajouter assignedAt si assignedTo est mis à jour.
+    // Réinitialiser notificationSent pour qu'une (ré)assignation redéclenche le push.
     if (data.assignedTo) {
-      Object.assign(updateData, { assignedAt: FirestoreService.getServerTimestamp() });
+      Object.assign(updateData, {
+        assignedAt: FirestoreService.getServerTimestamp(),
+        notificationSent: false,
+      });
     }
 
     // Ajouter completedAt si status passe à completed
@@ -148,16 +193,6 @@ export class FirestoreMissionService {
     }
 
     await FirestoreService.updateDocument(missionPath, updateData);
-  }
-
-  /**
-   * Assigner une mission à un driver
-   */
-  static async assignMission(missionId: string, driverUid: string): Promise<void> {
-    await this.updateMission(missionId, {
-      assignedTo: driverUid,
-      status: 'assignée',
-    });
   }
 
   /**

@@ -3,27 +3,36 @@
 // n'a pas de photo personnalisée. Modèles les plus courants au Niger :
 // pickup → Toyota Hilux, suv → Land Cruiser, sedan → Corolla, van → Hiace, truck → camion.
 //
-// 👉 POINT DE REMPLACEMENT UNIQUE : pour mettre tes propres photos (Hilux,
-// Land Cruiser, etc.), remplace simplement l'URL correspondante ci-dessous.
-// N'importe quelle URL d'image publique fonctionne.
+// Photos BUNDLÉES EN LOCAL (src/assets/vehicles/) → fonctionnent hors ligne,
+// pas de dépendance réseau. Vite les inclut au build et renvoie leur URL finale.
+//
+// 👉 POINT DE REMPLACEMENT UNIQUE : pour mettre tes propres photos, remplace
+// simplement les fichiers dans src/assets/vehicles/ (mêmes noms) OU change les
+// imports ci-dessous. Une photo par véhicule reste prioritaire via `vehicle.image`.
 
 import type { Vehicle } from '@/types';
+import pickupImg from '@/assets/vehicles/pickup.jpg';
+import suvImg from '@/assets/vehicles/suv.jpg';
+import sedanImg from '@/assets/vehicles/sedan.jpg';
+import vanImg from '@/assets/vehicles/van.jpg';
+import truckImg from '@/assets/vehicles/truck.jpg';
+import fallbackImg from '@/assets/vehicles/fallback.jpg';
 
 const DEFAULT_BY_TYPE: Record<Vehicle['type'], string> = {
   // Pickup — Toyota Hilux (omniprésent au Niger)
-  pickup: 'https://images.unsplash.com/photo-1559416523-140ddc3d238c?w=400&h=300&fit=crop',
+  pickup: pickupImg,
   // SUV — Toyota Land Cruiser (ONG, administration, flottes)
-  suv: 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?w=400&h=300&fit=crop',
+  suv: suvImg,
   // Berline — Toyota Corolla
-  sedan: 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=400&h=300&fit=crop',
+  sedan: sedanImg,
   // Van / minibus — Toyota Hiace
-  van: 'https://images.unsplash.com/photo-1551830820-330a71b99659?w=400&h=300&fit=crop',
+  van: vanImg,
   // Camion
-  truck: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=400&h=300&fit=crop',
+  truck: truckImg,
 };
 
 // Image générique de repli si le type est inconnu.
-const FALLBACK = 'https://images.unsplash.com/photo-1566008885218-90abf9200ddb?w=400&h=300&fit=crop';
+const FALLBACK = fallbackImg;
 
 /** Photo à afficher pour un véhicule : sa photo custom, sinon le défaut par type. */
 export function vehicleImageSrc(vehicle: Pick<Vehicle, 'image' | 'type'>): string {

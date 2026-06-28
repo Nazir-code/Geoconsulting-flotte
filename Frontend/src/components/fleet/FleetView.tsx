@@ -10,11 +10,14 @@ import { FirestoreVehicleService } from '@/services/firestoreVehicleService';
 import type { Vehicle, Driver, User } from '@/types';
 import { cn } from '@/lib/utils';
 import { EmptyState, Skeleton, SkeletonList } from '@/components/common';
+import { consumePendingFleetTab } from '@/lib/fleetNav';
 
 type TabType = 'vehicles' | 'drivers';
 
 export function FleetView() {
-  const [activeTab, setActiveTab] = useState<TabType>('vehicles');
+  // Onglet initial : 'drivers' si on arrive via la carte KPI « Chauffeurs »,
+  // sinon 'vehicles' par défaut.
+  const [activeTab, setActiveTab] = useState<TabType>(() => consumePendingFleetTab() ?? 'vehicles');
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -55,6 +58,7 @@ export function FleetView() {
           licenseNumber: 'N/A',
           licenseExpiry: 'N/A',
           status: fd.status === 'online' ? 'active' : 'off',
+          approvalStatus: fd.approvalStatus,
           rating: 5,
           totalMissions: 0,
           currentVehicleId: undefined,

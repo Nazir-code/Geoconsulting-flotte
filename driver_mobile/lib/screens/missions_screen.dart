@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/auth_service.dart';
 import '../services/missions_service.dart';
+import '../services/delivery_proof_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/mission_card_pro.dart';
+import '../widgets/ds_shimmer.dart';
+import '../widgets/delivery_proof_sheet.dart';
 
 class MissionsScreen extends StatefulWidget {
   const MissionsScreen({super.key});
@@ -19,6 +22,7 @@ class _MissionsScreenState extends State<MissionsScreen>
 
   String _selectedFilter = 'all';
   String? _busyMissionId;
+  int _refreshKey = 0;
 
   static const _filters = [
     (value: 'all',                              label: 'Toutes'),
@@ -44,7 +48,6 @@ class _MissionsScreenState extends State<MissionsScreen>
     final uid = _authService.currentUid;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text("Mes Missions"),
         actions: [
@@ -62,24 +65,37 @@ class _MissionsScreenState extends State<MissionsScreen>
           child: _buildFilterBar(),
         ),
       ),
-      body: uid == null
-          ? _buildNotConnected()
-          : StreamBuilder<QuerySnapshot>(
-              stream: _getFilteredStream(uid),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return _buildLoading();
-                }
-                if (snapshot.hasError) {
-                  return _buildError(snapshot.error.toString());
-                }
-                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                  return _buildEmptyState();
-                }
-                return _buildList(snapshot.data!.docs, uid);
-              },
-            ),
+      body: RefreshIndicator(
+        onRefresh: _handleRefresh,
+        color: AppColors.primary,
+        backgroundColor: AppColors.surface,
+        strokeWidth: 2.5,
+        displacement: 60,
+        child: uid == null
+            ? _buildNotConnected()
+            : StreamBuilder<QuerySnapshot>(
+                key: ValueKey('$_selectedFilter:$_refreshKey'),
+                stream: _getFilteredStream(uid),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return _buildLoading();
+                  }
+                  if (snapshot.hasError) {
+                    return _buildError(snapshot.error.toString());
+                  }
+                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                    return _buildEmptyState();
+                  }
+                  return _buildList(snapshot.data!.docs, uid);
+                },
+              ),
+      ),
     );
+  }
+
+  Future<void> _handleRefresh() async {
+    setState(() => _refreshKey++);
+    await Future.delayed(const Duration(milliseconds: 700));
   }
 
   // ── Filter bar ────────────────────────────────────────────────────────────
@@ -152,11 +168,7 @@ class _MissionsScreenState extends State<MissionsScreen>
                   )
               : null,
           onComplete: status == MissionsService.statusEnCours
-              ? () => _confirmAction(
-                    missionId: doc.id,
-                    actionType: _ActionType.complete,
-                    action: () => _missionsService.completeMission(doc.id, uid),
-                  )
+              ? () => _confirmComplete(missionId: doc.id, uid: uid)
               : null,
           onCancel: status == MissionsService.statusEnCours
               ? () => _confirmAction(
@@ -172,17 +184,18 @@ class _MissionsScreenState extends State<MissionsScreen>
 
   // ── States ────────────────────────────────────────────────────────────────
   Widget _buildLoading() {
-    return const Center(
-      child: CircularProgressIndicator(
-        color: AppColors.primary,
-        strokeWidth: 2.5,
+    return DsShimmer(
+      child: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
+        itemCount: 5,
+        itemBuilder: (_, __) => const MissionCardSkeleton(),
       ),
     );
   }
 
   Widget _buildNotConnected() {
-    return Center(
-      child: Column(
+    return _scrollableCenter(
+      Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           const Icon(Icons.account_circle_outlined,
@@ -195,15 +208,15 @@ class _MissionsScreenState extends State<MissionsScreen>
   }
 
   Widget _buildError(String msg) {
-    return Center(
-      child: Padding(
+    return _scrollableCenter(
+      Padding(
         padding: AppSpacing.pagePadding,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: AppColors.errorLight,
                 shape: BoxShape.circle,
               ),
@@ -226,10 +239,21 @@ class _MissionsScreenState extends State<MissionsScreen>
     );
   }
 
+  Widget _scrollableCenter(Widget child) {
+    return LayoutBuilder(
+      builder: (_, constraints) => SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+          child: Center(child: child),
+        ),
+      ),
+    );
+  }
+
   Widget _buildEmptyState() {
     final isFiltered = _selectedFilter != 'all';
-    return Center(
-      child: Padding(
+    return _scrollableCenter(Padding(
         padding: AppSpacing.pagePadding,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -283,8 +307,7 @@ class _MissionsScreenState extends State<MissionsScreen>
             ],
           ],
         ),
-      ),
-    );
+    ));
   }
 
   // ── Firestore query ───────────────────────────────────────────────────────
@@ -298,6 +321,49 @@ class _MissionsScreenState extends State<MissionsScreen>
     }
 
     return q.orderBy('createdAt', descending: true).snapshots();
+  }
+
+  // ── Complete with optional photo proof ───────────────────────────────────
+  Future<void> _confirmComplete({
+    required String missionId,
+    required String uid,
+  }) async {
+    final result = await showDeliveryProofSheet(context);
+    if (result == null || !result.confirmed || !mounted) return;
+
+    setState(() => _busyMissionId = missionId);
+    try {
+      if (result.photoFile != null) {
+        final photoUrl = await DeliveryProofService.uploadPhoto(
+          missionId: missionId,
+          photoFile: result.photoFile!,
+        );
+        await DeliveryProofService.saveProofToMission(
+          missionId: missionId,
+          photoUrl: photoUrl,
+        );
+      }
+      await _missionsService.completeMission(missionId, uid);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result.photoFile != null
+              ? 'Mission terminée — photo enregistrée.'
+              : 'Mission terminée.'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur : $error'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _busyMissionId = null);
+    }
   }
 
   // ── Action confirmation dialog ────────────────────────────────────────────

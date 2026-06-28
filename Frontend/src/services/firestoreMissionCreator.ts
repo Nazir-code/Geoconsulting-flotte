@@ -3,7 +3,7 @@
 
 import { collection, query, where, getDocs, doc, setDoc, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebaseConfig';
-import { toStorageStatus } from './firestoreMissionService';
+import { toStorageStatus, notifyMissionAssigned } from './firestoreMissionService';
 
 /**
  * Trouver un driver par email et retourner son UID Firebase
@@ -34,7 +34,6 @@ export async function findDriverUidByEmail(email: string): Promise<string | null
  */
 export async function verifyDriverExists(uid: string): Promise<boolean> {
   try {
-    const driverRef = doc(db, 'drivers', uid);
     const driverDoc = await getDocs(query(collection(db, 'drivers'), where('uid', '==', uid)));
     return !driverDoc.empty;
   } catch (error) {
@@ -99,6 +98,9 @@ export async function createMissionWithFirebaseUid(
     console.log(`   Assignée à (UID): ${driverUid}`);
     console.log(`   Destination: ${location}`);
     
+    // Déclencher le push FCM (fire-and-forget, n'impacte pas le succès de la création).
+    void notifyMissionAssigned(missionId);
+
     return {
       success: true,
       missionId,

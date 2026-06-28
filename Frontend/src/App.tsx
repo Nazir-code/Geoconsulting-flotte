@@ -13,6 +13,7 @@ import { DashboardView } from '@/components/dashboard/DashboardView';
 import { FleetView } from '@/components/fleet/FleetView';
 import { MissionsView } from '@/components/missions/MissionsView';
 import { FuelView } from '@/components/fuel/FuelView';
+import { AlertsView } from '@/components/alerts/AlertsView';
 import { ReportsView } from '@/components/reports/ReportsView';
 import { SettingsView } from '@/components/settings/SettingsView';
 
@@ -20,11 +21,12 @@ import { SettingsView } from '@/components/settings/SettingsView';
 // Section titles mapping
 const sectionTitles: Record<string, string> = {
   dashboard: 'Tableau de Bord',
-  fleet: 'Flotte & Chauffeurs',
-  missions: 'Contrôle des Missions',
-  fuel: 'Carburant & Maintenance',
-  reports: 'Rapports & Analytiques',
-  settings: 'Paramètres',
+  fleet:     'Flotte & Chauffeurs',
+  missions:  'Contrôle des Missions',
+  fuel:      'Carburant & Maintenance',
+  alerts:    'Alertes Véhicules',
+  reports:   'Rapports & Analytiques',
+  settings:  'Paramètres',
 };
 
 function AppContent() {
@@ -72,6 +74,8 @@ function AppContent() {
           return <MissionsView />;
         case 'fuel':
           return <FuelView />;
+        case 'alerts':
+          return <AlertsView />;
         case 'reports':
           return <ReportsView />;
         case 'settings':

@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Bell, Sun, Moon, MapPin, RefreshCw } from 'lucide-react';
+import { Bell, Sun, Moon, MapPin, RefreshCw, Check, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext_Firebase';
 import { useTheme } from '@/context/ThemeContext';
 import { formatTime } from '@/lib/utils';
@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import { FirestoreMissionService, type Mission as FirestoreMission } from '@/services/firestoreMissionService';
 import { FirestoreFuelService, type FuelRecord } from '@/services/firestoreFuelService';
 import { FirestoreMaintenanceService, type MaintenanceRequest } from '@/services/firestoreMaintenanceService';
+import { FirestoreDriverService, type Driver } from '@/services/firestoreDriverService';
 
 interface TopBarProps {
   title: string;
@@ -22,6 +23,7 @@ export function TopBar({ title, onRefresh }: TopBarProps) {
   const [missions, setMissions] = useState<FirestoreMission[]>([]);
   const [fuelRecords, setFuelRecords] = useState<FuelRecord[]>([]);
   const [maintRequests, setMaintRequests] = useState<MaintenanceRequest[]>([]);
+  const [drivers, setDrivers] = useState<Driver[]>([]);
   const [temp, setTemp] = useState<number | null>(null);
 
   const handleRefresh = () => {
@@ -43,10 +45,12 @@ export function TopBar({ title, onRefresh }: TopBarProps) {
     const unsubMissions = FirestoreMissionService.allMissionsListener(setMissions);
     const unsubFuel = FirestoreFuelService.allFuelRecordsListener(setFuelRecords);
     const unsubMaint = FirestoreMaintenanceService.allRequestsListener(setMaintRequests);
+    const unsubDrivers = FirestoreDriverService.allDriversListener(setDrivers);
     return () => {
       unsubMissions();
       unsubFuel();
       unsubMaint();
+      unsubDrivers();
     };
   }, []);
 
@@ -74,8 +78,8 @@ export function TopBar({ title, onRefresh }: TopBarProps) {
     };
   }, []);
 
-  // Notifications unifiées : missions + pleins + demandes d'entretien.
-  type Notif = { id: string; title: string; message: string; type: string; time: Date; isRead: boolean };
+  // Notifications unifiées : missions + pleins + demandes d'entretien + inscriptions.
+  type Notif = { id: string; title: string; message: string; type: string; time: Date; isRead: boolean; driverUid?: string };
 
   const missionNotifs: Notif[] = missions.map((m) => {
     const status = m.status as string;
@@ -114,14 +118,27 @@ export function TopBar({ title, onRefresh }: TopBarProps) {
     isRead: q.status === 'resolved',
   }));
 
-  const notifications = [...missionNotifs, ...fuelNotifs, ...maintNotifs]
+  // Demandes d'inscription chauffeur EN ATTENTE (mobile) → à approuver/refuser.
+  const pendingDrivers = drivers.filter((d) => d.approvalStatus === 'pending');
+  const driverNotifs: Notif[] = pendingDrivers.map((d) => ({
+    id: `driver-${d.id}`,
+    title: "Demande d'inscription",
+    message: `${d.name || 'Chauffeur'} · ${d.email}`,
+    type: 'warning',
+    time: d.createdAt?.toDate?.() || new Date(),
+    isRead: false,
+    driverUid: d.uid,
+  }));
+
+  const notifications = [...missionNotifs, ...fuelNotifs, ...maintNotifs, ...driverNotifs]
     .sort((a, b) => b.time.getTime() - a.time.getTime())
     .slice(0, 8);
 
-  // Badge : missions en attente + demandes d'entretien ouvertes.
+  // Badge : missions en attente + demandes d'entretien ouvertes + inscriptions en attente.
   const unreadCount =
     missions.filter((m) => (m.status as string) === 'en_attente').length +
-    maintRequests.filter((q) => q.status === 'requested').length;
+    maintRequests.filter((q) => q.status === 'requested').length +
+    pendingDrivers.length;
 
   return (
     <motion.header
@@ -260,6 +277,28 @@ export function TopBar({ title, onRefresh }: TopBarProps) {
                           <p className="text-[10px] text-text-secondary/60 mt-1">
                             {notification.time.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                           </p>
+                          {notification.driverUid && (
+                            <div className="flex items-center gap-2 mt-2">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  FirestoreDriverService.setApprovalStatus(notification.driverUid!, 'approved');
+                                }}
+                                className="flex-1 flex items-center justify-center gap-1 px-2 py-1 rounded-md bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-medium transition-colors"
+                              >
+                                <Check className="w-3 h-3" /> Approuver
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  FirestoreDriverService.setApprovalStatus(notification.driverUid!, 'rejected');
+                                }}
+                                className="flex-1 flex items-center justify-center gap-1 px-2 py-1 rounded-md bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-medium transition-colors"
+                              >
+                                <X className="w-3 h-3" /> Refuser
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>

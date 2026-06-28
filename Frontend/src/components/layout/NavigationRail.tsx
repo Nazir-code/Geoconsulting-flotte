@@ -1,15 +1,18 @@
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { 
-  LayoutDashboard, 
-  Car, 
-  Route, 
-  Fuel, 
-  BarChart3, 
+import {
+  LayoutDashboard,
+  Car,
+  Route,
+  Fuel,
+  BarChart3,
   Settings,
-  LogOut
+  LogOut,
+  Bell,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext_Firebase';
 import { cn } from '@/lib/utils';
+import { activeAlertsListener } from '@/services/firestoreAlertService';
 
 interface NavigationRailProps {
   activeSection: string;
@@ -18,15 +21,24 @@ interface NavigationRailProps {
 
 const navItems = [
   { id: 'dashboard', label: 'Tableau de Bord', icon: LayoutDashboard },
-  { id: 'fleet', label: 'Flotte', icon: Car },
-  { id: 'missions', label: 'Missions', icon: Route },
-  { id: 'fuel', label: 'Carburant', icon: Fuel },
-  { id: 'reports', label: 'Rapports', icon: BarChart3 },
-  { id: 'settings', label: 'Paramètres', icon: Settings },
+  { id: 'fleet',     label: 'Flotte',          icon: Car },
+  { id: 'missions',  label: 'Missions',         icon: Route },
+  { id: 'fuel',      label: 'Carburant',        icon: Fuel },
+  { id: 'alerts',    label: 'Alertes',          icon: Bell },
+  { id: 'reports',   label: 'Rapports',         icon: BarChart3 },
+  { id: 'settings',  label: 'Paramètres',       icon: Settings },
 ];
 
 export function NavigationRail({ activeSection, onSectionChange }: NavigationRailProps) {
   const { signOut } = useAuth();
+  const [criticalCount, setCriticalCount] = useState(0);
+
+  useEffect(() => {
+    const unsub = activeAlertsListener((alerts) => {
+      setCriticalCount(alerts.filter((a) => a.severity === 'critical').length);
+    });
+    return unsub;
+  }, []);
 
   return (
     <motion.nav
@@ -52,7 +64,8 @@ export function NavigationRail({ activeSection, onSectionChange }: NavigationRai
         {navItems.map((item, index) => {
           const Icon = item.icon;
           const isActive = activeSection === item.id;
-          
+          const showBadge = item.id === 'alerts' && criticalCount > 0;
+
           return (
             <motion.button
               key={item.id}
@@ -62,19 +75,26 @@ export function NavigationRail({ activeSection, onSectionChange }: NavigationRai
               onClick={() => onSectionChange(item.id)}
               className={cn(
                 'relative w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-300 group',
-                isActive 
-                  ? 'bg-accent-cyan/10 border border-accent-cyan/50' 
+                isActive
+                  ? 'bg-accent-cyan/10 border border-accent-cyan/50'
                   : 'border border-transparent hover:border-border hover:bg-background-secondary'
               )}
             >
-              <Icon 
+              <Icon
                 className={cn(
                   'w-5 h-5 transition-colors duration-300',
                   isActive ? 'text-accent-cyan' : 'text-text-secondary group-hover:text-text-primary'
-                )} 
-                strokeWidth={1.5} 
+                )}
+                strokeWidth={1.5}
               />
-              
+
+              {/* Badge alertes critiques */}
+              {showBadge && (
+                <span className="absolute top-1.5 right-1.5 min-w-[14px] h-3.5 px-0.5 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center leading-none">
+                  {criticalCount > 9 ? '9+' : criticalCount}
+                </span>
+              )}
+
               {/* Active Indicator */}
               {isActive && (
                 <motion.div
@@ -87,6 +107,11 @@ export function NavigationRail({ activeSection, onSectionChange }: NavigationRai
               {/* Tooltip */}
               <div className="absolute left-full ml-3 px-2.5 py-1.5 rounded-lg text-xs font-medium text-accent-cyan bg-background-secondary/95 backdrop-blur-sm border border-accent-cyan/30 shadow-lg shadow-accent-cyan/10 whitespace-nowrap opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-200 ease-out pointer-events-none z-50">
                 {item.label}
+                {showBadge && (
+                  <span className="ml-1.5 px-1 py-0.5 rounded-full bg-red-500 text-white text-[9px] font-bold">
+                    {criticalCount}
+                  </span>
+                )}
               </div>
             </motion.button>
           );

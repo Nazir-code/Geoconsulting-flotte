@@ -1,8 +1,9 @@
 import { motion } from 'framer-motion';
-import { Phone, Star, Route, User, Calendar, Trash2 } from 'lucide-react';
+import { Phone, Star, Route, User, Calendar, Trash2, Check, X } from 'lucide-react';
 import type { Driver } from '@/types';
 import { formatNumber } from '@/lib/utils';
 import { StatusChip } from '@/components/common';
+import { FirestoreDriverService } from '@/services/firestoreDriverService';
 
 interface DriverCardProps {
   driver: Driver;
@@ -12,6 +13,9 @@ interface DriverCardProps {
 
 export function DriverCard({ driver, index, onDelete }: DriverCardProps) {
   const isActive = driver.status === 'active';
+  const uid = driver.user?.id || driver.userId || driver.id;
+  const isPending = driver.approvalStatus === 'pending';
+  const isRejected = driver.approvalStatus === 'rejected';
 
   return (
     <motion.div
@@ -49,7 +53,17 @@ export function DriverCard({ driver, index, onDelete }: DriverCardProps) {
           <h3 className="text-sm font-medium text-text-primary truncate">
             {driver.user.firstName} {driver.user.lastName}
           </h3>
-          <StatusChip status={driver.status} size="sm" />
+          {isPending ? (
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-accent-orange/15 text-accent-orange whitespace-nowrap">
+              En attente
+            </span>
+          ) : isRejected ? (
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-500/15 text-red-400 whitespace-nowrap">
+              Refusé
+            </span>
+          ) : (
+            <StatusChip status={driver.status} size="sm" />
+          )}
         </div>
 
         <div className="flex items-center gap-3 text-xs text-text-secondary">
@@ -103,11 +117,31 @@ export function DriverCard({ driver, index, onDelete }: DriverCardProps) {
       )}
 
       {/* Actions */}
-      <div className="flex items-start">
+      <div className="flex items-center gap-1 ml-2">
+        {isPending && (
+          <>
+            <button
+              onClick={() => FirestoreDriverService.setApprovalStatus(uid, 'approved')}
+              title="Approuver l'inscription"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-medium transition-colors"
+            >
+              <Check className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Approuver</span>
+            </button>
+            <button
+              onClick={() => FirestoreDriverService.setApprovalStatus(uid, 'rejected')}
+              title="Refuser l'inscription"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-medium transition-colors"
+            >
+              <X className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Refuser</span>
+            </button>
+          </>
+        )}
         <button
-          onClick={() => onDelete?.(driver.user?.id || driver.userId || driver.id)}
+          onClick={() => onDelete?.(uid)}
           title="Supprimer le chauffeur"
-          className="ml-3 p-2 rounded-md text-red-400 hover:bg-red-500/10 transition-colors"
+          className="p-2 rounded-md text-red-400 hover:bg-red-500/10 transition-colors"
         >
           <Trash2 className="w-4 h-4" />
         </button>

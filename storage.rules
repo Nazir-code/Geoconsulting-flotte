@@ -1,0 +1,28 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Photos de preuve de livraison uploadées par les chauffeurs.
+    // Chemin : delivery_proofs/{missionId}_{timestamp}.jpg
+    match /delivery_proofs/{fileName} {
+      // Tout utilisateur authentifié peut uploader une preuve.
+      // La taille est limitée à 10 Mo et le fichier doit être une image.
+      allow write: if request.auth != null
+                   && request.resource.size <= 10 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+
+      // Tout utilisateur authentifié peut lire les preuves
+      // (managers web + chauffeur qui consulte son historique).
+      allow read: if request.auth != null;
+
+      // Suppression réservée : aucun utilisateur ne peut supprimer via client SDK.
+      // (La suppression se fait uniquement via Firebase Console ou Admin SDK.)
+    }
+
+    // Refuser tout autre chemin par défaut.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

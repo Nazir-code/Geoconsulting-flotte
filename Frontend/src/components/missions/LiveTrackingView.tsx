@@ -68,7 +68,7 @@ export function LiveTrackingView({ missions }: LiveTrackingViewProps) {
             missionId: d.currentMission || mission?.id || '',
             lat: d.latitude!,
             lng: d.longitude!,
-            speed: (d as unknown as { speed?: number }).speed || 0,
+            speed: d.speed ? Math.round(d.speed) : 0,
             heading: d.heading || 0,
             progress: (d as unknown as { progress?: number }).progress || 0,
             distanceDone: 0,

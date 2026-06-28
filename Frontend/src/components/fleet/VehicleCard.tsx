@@ -25,15 +25,15 @@ export function VehicleCard({ vehicle, index, onEdit, onDelete }: VehicleCardPro
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.1 + index * 0.05, duration: 0.4 }}
       whileHover={{ y: -4, transition: { duration: 0.2 } }}
-      className="glass-card overflow-hidden card-hover"
+      className="group glass-card overflow-hidden card-hover"
     >
       {/* Vehicle Image */}
-      <div className="relative h-40 overflow-hidden">
+      <div className="relative h-44 overflow-hidden">
         {!imgFailed ? (
           <img
             src={imageSrc}
             alt={`${vehicle.brand} ${vehicle.model}`}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
             loading="lazy"
             onError={() => setImgFailed(true)}
           />
@@ -42,7 +42,10 @@ export function VehicleCard({ vehicle, index, onEdit, onDelete }: VehicleCardPro
             <Car className="w-16 h-16 text-text-secondary/30" strokeWidth={1} />
           </div>
         )}
-        
+
+        {/* Scrim dégradé : profondeur + lisibilité des overlays (look fiche produit) */}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-black/5 to-transparent" />
+
         {/* Status Badge */}
         <div className="absolute top-3 left-3">
           <StatusChip status={vehicle.status} size="sm" />
