@@ -76,9 +76,9 @@ class _QuickActionButtonState extends State<QuickActionButton>
                   width: 60,
                   height: 60,
                   decoration: BoxDecoration(
-                    color: AppColors.surface,
+                    color: context.palette.surface,
                     borderRadius: AppSpacing.roundedLg,
-                    border: Border.all(color: AppColors.borderLight),
+                    border: Border.all(color: context.palette.borderLight),
                     boxShadow: AppTheme.shadowSm,
                   ),
                   child: Icon(widget.icon, color: widget.color, size: 26),
@@ -112,7 +112,7 @@ class _QuickActionButtonState extends State<QuickActionButton>
             Text(
               widget.label,
               style: AppTextStyles.labelSm.copyWith(
-                color: AppColors.textPrimary,
+                color: context.palette.textPrimary,
                 letterSpacing: 0.1,
                 fontSize: 12,
               ),

@@ -21,7 +21,8 @@ export function formatNumber(num: number): string {
 }
 
 // Format date
-export function formatDate(date: string | Date, options?: Intl.DateTimeFormatOptions): string {
+export function formatDate(date: string | Date | undefined | null, options?: Intl.DateTimeFormatOptions): string {
+  if (!date) return 'N/A';
   const d = typeof date === 'string' ? new Date(date) : date;
   const defaultOptions: Intl.DateTimeFormatOptions = {
     day: '2-digit',

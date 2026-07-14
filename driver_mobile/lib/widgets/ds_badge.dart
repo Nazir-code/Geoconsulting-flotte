@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 
 enum DsBadgeStyle { filled, outlined, soft }
@@ -17,7 +18,7 @@ class DsBadge extends StatelessWidget {
     required this.color,
     this.style = DsBadgeStyle.soft,
     this.icon,
-    this.fontSize = 11,
+    this.fontSize = 10,
   });
 
   // ── Factory constructors ─────────────────────────────────────────────────
@@ -78,11 +79,14 @@ class DsBadge extends StatelessWidget {
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: AppSpacing.roundedFull,
-        border: border,
+        border: border ??
+            (style == DsBadgeStyle.soft
+                ? Border.all(color: color.withValues(alpha: 0.15), width: 1)
+                : null),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -92,13 +96,12 @@ class DsBadge extends StatelessWidget {
             const SizedBox(width: 4),
           ],
           Text(
-            label,
-            style: TextStyle(
-              fontFamily: 'Inter',
+            label.toUpperCase(),
+            style: GoogleFonts.plusJakartaSans(
               fontSize: fontSize,
               fontWeight: FontWeight.w700,
               color: fg,
-              letterSpacing: 0.3,
+              letterSpacing: 0.6,
             ),
           ),
         ],
@@ -130,7 +133,7 @@ class DsDot extends StatelessWidget {
       );
     }
 
-    return _PulsingDot(color: color, size: size);
+    return RepaintBoundary(child: _PulsingDot(color: color, size: size));
   }
 }
 

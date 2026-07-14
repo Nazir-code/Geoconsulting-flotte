@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/auth_service.dart';
 import '../services/missions_service.dart';
 import '../services/delivery_proof_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/mission_card_pro.dart';
+import '../widgets/animated_list_item.dart';
 import '../widgets/ds_shimmer.dart';
 import '../widgets/delivery_proof_sheet.dart';
 
@@ -17,6 +19,7 @@ class MissionsScreen extends StatefulWidget {
 
 class _MissionsScreenState extends State<MissionsScreen>
     with SingleTickerProviderStateMixin {
+  // ── Services — INCHANGÉS ──────────────────────────────────────────────────
   final AuthService _authService = AuthService();
   final MissionsService _missionsService = MissionsService();
 
@@ -32,14 +35,14 @@ class _MissionsScreenState extends State<MissionsScreen>
     (value: MissionsService.statusAnnulee,      label: 'Annulées'),
   ];
 
-  // Couleur de badge par filtre
+  // Couleur de badge par filtre — violet pour "Toutes", couleurs sémantiques sinon
   Color _filterColor(String value) {
     switch (value) {
       case MissionsService.statusEnCours:   return AppColors.statusActive;
       case MissionsService.statusTerminee:  return AppColors.statusCompleted;
       case MissionsService.statusAnnulee:   return AppColors.statusCancelled;
       case MissionsService.statusAssignee:  return AppColors.statusAssigned;
-      default:                              return AppColors.primary;
+      default:                              return AppColors.violet;
     }
   }
 
@@ -48,14 +51,26 @@ class _MissionsScreenState extends State<MissionsScreen>
     final uid = _authService.currentUid;
 
     return Scaffold(
+      backgroundColor: context.palette.background,
       appBar: AppBar(
-        title: const Text("Mes Missions"),
+        backgroundColor: context.palette.surface,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        systemOverlayStyle: SystemUiOverlayStyle.dark,
+        automaticallyImplyLeading: false,
+        title: Text(
+          'Mes Missions',
+          style: AppTextStyles.jkScreenTitle.copyWith(
+            color: context.palette.textHeading,
+          ),
+        ),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 8),
             child: IconButton(
-              icon: const Icon(Icons.filter_list_rounded),
-              tooltip: "Filtrer",
+              icon: Icon(Icons.tune_rounded,
+                  color: context.palette.textSecondary, size: 22),
+              tooltip: 'Filtrer',
               onPressed: () {},
             ),
           ),
@@ -65,10 +80,11 @@ class _MissionsScreenState extends State<MissionsScreen>
           child: _buildFilterBar(),
         ),
       ),
+      // ── RefreshIndicator + Stream — INCHANGÉS ─────────────────────────────
       body: RefreshIndicator(
         onRefresh: _handleRefresh,
-        color: AppColors.primary,
-        backgroundColor: AppColors.surface,
+        color: AppColors.violet,
+        backgroundColor: context.palette.surface,
         strokeWidth: 2.5,
         displacement: 60,
         child: uid == null
@@ -93,16 +109,22 @@ class _MissionsScreenState extends State<MissionsScreen>
     );
   }
 
+  // ── Refresh — INCHANGÉ ────────────────────────────────────────────────────
   Future<void> _handleRefresh() async {
     setState(() => _refreshKey++);
     await Future.delayed(const Duration(milliseconds: 700));
   }
 
-  // ── Filter bar ────────────────────────────────────────────────────────────
+  // ── Barre de filtres v2 ───────────────────────────────────────────────────
   Widget _buildFilterBar() {
     return Container(
       height: 56,
-      color: AppColors.surface,
+      decoration: BoxDecoration(
+        color: context.palette.surface,
+        border: Border(
+          bottom: BorderSide(color: context.palette.borderLight, width: 1),
+        ),
+      ),
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -118,22 +140,21 @@ class _MissionsScreenState extends State<MissionsScreen>
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
               curve: Curves.easeInOut,
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 0),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
-                color: isSelected ? color : AppColors.surfaceVariant,
+                color: isSelected ? color : context.palette.background,
                 borderRadius: AppSpacing.roundedFull,
                 border: Border.all(
-                  color: isSelected ? color : Colors.transparent,
+                  color: isSelected ? color : context.palette.borderLight,
+                  width: 1,
                 ),
               ),
               child: Center(
                 child: Text(
                   f.label,
-                  style: TextStyle(
-                    fontFamily: 'Inter',
-                    color: isSelected ? Colors.white : AppColors.textSecondary,
-                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                    fontSize: 13,
+                  style: AppTextStyles.jkBadge.copyWith(
+                    color: isSelected ? Colors.white : context.palette.textSecondary,
+                    fontSize: 11,
                   ),
                 ),
               ),
@@ -144,7 +165,7 @@ class _MissionsScreenState extends State<MissionsScreen>
     );
   }
 
-  // ── Mission list ──────────────────────────────────────────────────────────
+  // ── Liste missions — INCHANGÉE (Firestore + AnimatedListItem) ─────────────
   Widget _buildList(List<QueryDocumentSnapshot> docs, String uid) {
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
@@ -155,34 +176,39 @@ class _MissionsScreenState extends State<MissionsScreen>
           'id': doc.id,
           ...(doc.data() as Map<String, dynamic>),
         };
-        final status = MissionsService.normalizeStatus(data['status'] as String?);
-        return MissionCardPro(
-          mission: data,
-          isBusy: _busyMissionId == doc.id,
-          onStart: status == MissionsService.statusAssignee ||
-                  status == MissionsService.statusEnAttente
-              ? () => _confirmAction(
-                    missionId: doc.id,
-                    actionType: _ActionType.start,
-                    action: () => _missionsService.acceptMission(doc.id, uid),
-                  )
-              : null,
-          onComplete: status == MissionsService.statusEnCours
-              ? () => _confirmComplete(missionId: doc.id, uid: uid)
-              : null,
-          onCancel: status == MissionsService.statusEnCours
-              ? () => _confirmAction(
-                    missionId: doc.id,
-                    actionType: _ActionType.cancel,
-                    action: () => _missionsService.cancelMission(doc.id, uid),
-                  )
-              : null,
+        final status =
+            MissionsService.normalizeStatus(data['status'] as String?);
+        return AnimatedListItem(
+          key: ValueKey(doc.id),
+          index: index,
+          child: MissionCardPro(
+            mission: data,
+            isBusy: _busyMissionId == doc.id,
+            onStart: status == MissionsService.statusAssignee ||
+                    status == MissionsService.statusEnAttente
+                ? () => _confirmAction(
+                      missionId: doc.id,
+                      actionType: _ActionType.start,
+                      action: () => _missionsService.acceptMission(doc.id, uid),
+                    )
+                : null,
+            onComplete: status == MissionsService.statusEnCours
+                ? () => _confirmComplete(missionId: doc.id, uid: uid)
+                : null,
+            onCancel: status == MissionsService.statusEnCours
+                ? () => _confirmAction(
+                      missionId: doc.id,
+                      actionType: _ActionType.cancel,
+                      action: () => _missionsService.cancelMission(doc.id, uid),
+                    )
+                : null,
+          ),
         );
       },
     );
   }
 
-  // ── States ────────────────────────────────────────────────────────────────
+  // ── États — INCHANGÉS dans leur logique ───────────────────────────────────
   Widget _buildLoading() {
     return DsShimmer(
       child: ListView.builder(
@@ -198,10 +224,23 @@ class _MissionsScreenState extends State<MissionsScreen>
       Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.account_circle_outlined,
-              size: 64, color: AppColors.textSecondary),
+          Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              color: AppColors.violetLight,
+              borderRadius: BorderRadius.circular(22),
+            ),
+            child: const Icon(Icons.account_circle_outlined,
+                size: 36, color: AppColors.violet),
+          ),
           AppSpacing.gapLg,
-          Text("Utilisateur non connecté", style: AppTextStyles.h4),
+          Text(
+            'Utilisateur non connecté',
+            style: AppTextStyles.jkSectionTitle.copyWith(
+              color: context.palette.textHeading,
+            ),
+          ),
         ],
       ),
     );
@@ -215,20 +254,26 @@ class _MissionsScreenState extends State<MissionsScreen>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(16),
-              decoration: const BoxDecoration(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
                 color: AppColors.errorLight,
-                shape: BoxShape.circle,
+                borderRadius: BorderRadius.circular(22),
               ),
               child: const Icon(Icons.wifi_off_rounded,
                   color: AppColors.error, size: 36),
             ),
             AppSpacing.gapLg,
-            Text("Erreur de chargement", style: AppTextStyles.h4),
+            Text(
+              'Erreur de chargement',
+              style: AppTextStyles.jkSectionTitle.copyWith(
+                color: context.palette.textHeading,
+              ),
+            ),
             AppSpacing.gapSm,
             Text(
               msg,
-              style: AppTextStyles.bodySm,
+              style: AppTextStyles.jkCardSub
+                  .copyWith(color: context.palette.textSecondary),
               textAlign: TextAlign.center,
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
@@ -253,37 +298,41 @@ class _MissionsScreenState extends State<MissionsScreen>
 
   Widget _buildEmptyState() {
     final isFiltered = _selectedFilter != 'all';
-    return _scrollableCenter(Padding(
+    return _scrollableCenter(
+      Padding(
         padding: AppSpacing.pagePadding,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              width: 88,
-              height: 88,
+              width: 80,
+              height: 80,
               decoration: BoxDecoration(
-                color: AppColors.surfaceVariant,
-                shape: BoxShape.circle,
+                color: AppColors.violetLight,
+                borderRadius: BorderRadius.circular(24),
               ),
               child: Icon(
                 isFiltered
                     ? Icons.filter_alt_off_rounded
                     : Icons.assignment_outlined,
-                size: 40,
-                color: AppColors.textSecondary,
+                size: 36,
+                color: AppColors.violet,
               ),
             ),
             AppSpacing.gapXl,
             Text(
-              isFiltered ? "Aucun résultat" : "Aucune mission",
-              style: AppTextStyles.h3,
+              isFiltered ? 'Aucun résultat' : 'Aucune mission',
+              style: AppTextStyles.jkScreenTitle.copyWith(
+                color: context.palette.textHeading,
+              ),
             ),
             AppSpacing.gapSm,
             Text(
               isFiltered
-                  ? "Aucune mission ne correspond au filtre sélectionné."
-                  : "Vos missions assignées apparaîtront ici.",
-              style: AppTextStyles.bodySm,
+                  ? 'Aucune mission ne correspond au filtre sélectionné.'
+                  : 'Vos missions assignées apparaîtront ici.',
+              style: AppTextStyles.jkCardSub
+                  .copyWith(color: context.palette.textSecondary),
               textAlign: TextAlign.center,
             ),
             if (isFiltered) ...[
@@ -294,23 +343,25 @@ class _MissionsScreenState extends State<MissionsScreen>
                   padding: const EdgeInsets.symmetric(
                       horizontal: 20, vertical: 12),
                   decoration: BoxDecoration(
-                    color: AppColors.primaryLight,
+                    color: AppColors.violetLight,
                     borderRadius: AppSpacing.roundedFull,
                   ),
                   child: Text(
-                    "Voir toutes les missions",
-                    style: AppTextStyles.label
-                        .copyWith(color: AppColors.primary),
+                    'Voir toutes les missions',
+                    style: AppTextStyles.jkBtnSm.copyWith(
+                      color: AppColors.violet,
+                    ),
                   ),
                 ),
               ),
             ],
           ],
         ),
-    ));
+      ),
+    );
   }
 
-  // ── Firestore query ───────────────────────────────────────────────────────
+  // ── Requête Firestore — INCHANGÉE ─────────────────────────────────────────
   Stream<QuerySnapshot> _getFilteredStream(String uid) {
     Query q = FirebaseFirestore.instance
         .collection('missions')
@@ -323,7 +374,7 @@ class _MissionsScreenState extends State<MissionsScreen>
     return q.orderBy('createdAt', descending: true).snapshots();
   }
 
-  // ── Complete with optional photo proof ───────────────────────────────────
+  // ── Complétion avec photo — INCHANGÉE ─────────────────────────────────────
   Future<void> _confirmComplete({
     required String missionId,
     required String uid,
@@ -366,7 +417,7 @@ class _MissionsScreenState extends State<MissionsScreen>
     }
   }
 
-  // ── Action confirmation dialog ────────────────────────────────────────────
+  // ── Dialog confirmation action — INCHANGÉE ────────────────────────────────
   Future<void> _confirmAction({
     required String missionId,
     required _ActionType actionType,
@@ -408,15 +459,20 @@ class _MissionsScreenState extends State<MissionsScreen>
                       child: OutlinedButton(
                         onPressed: () => Navigator.pop(ctx, false),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.textSecondary,
-                          side: const BorderSide(color: AppColors.border),
+                          foregroundColor: context.palette.textSecondary,
+                          side: BorderSide(color: context.palette.border),
                           shape: RoundedRectangleBorder(
                               borderRadius: AppSpacing.roundedMd),
+                          padding: EdgeInsets.zero,
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
-                        child: Text("Annuler",
-                            maxLines: 1,
-                            style: AppTextStyles.btn.copyWith(
-                                color: AppColors.textSecondary, letterSpacing: 0)),
+                        child: Text(
+                          'Annuler',
+                          maxLines: 1,
+                          style: AppTextStyles.btn.copyWith(
+                              color: context.palette.textSecondary, letterSpacing: 0),
+                        ),
                       ),
                     ),
                   ),
@@ -432,11 +488,16 @@ class _MissionsScreenState extends State<MissionsScreen>
                           elevation: 0,
                           shape: RoundedRectangleBorder(
                               borderRadius: AppSpacing.roundedMd),
+                          padding: EdgeInsets.zero,
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
-                        child: Text("Confirmer",
-                            maxLines: 1,
-                            style: AppTextStyles.btn.copyWith(
-                                color: Colors.white, letterSpacing: 0)),
+                        child: Text(
+                          'Confirmer',
+                          maxLines: 1,
+                          style: AppTextStyles.btn.copyWith(
+                              color: Colors.white, letterSpacing: 0),
+                        ),
                       ),
                     ),
                   ),
@@ -474,9 +535,10 @@ class _MissionsScreenState extends State<MissionsScreen>
   }
 }
 
-// ── Action type helpers ───────────────────────────────────────────────────────
+// ── Enum action type — INCHANGÉ ───────────────────────────────────────────────
 enum _ActionType { start, complete, cancel }
 
+// ── Config action par type — start passe en violet (cohérence palette) ────────
 ({String title, String message, String successMessage, IconData icon, Color color})
     _actionConfig(_ActionType type) {
   switch (type) {
@@ -486,7 +548,7 @@ enum _ActionType { start, complete, cancel }
         message: 'Le statut passera en cours et la mission sera visible en live.',
         successMessage: 'Mission démarrée.',
         icon: Icons.play_arrow_rounded,
-        color: AppColors.primary,
+        color: AppColors.violet,
       );
     case _ActionType.complete:
       return (

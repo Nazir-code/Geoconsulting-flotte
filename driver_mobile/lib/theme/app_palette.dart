@@ -19,6 +19,8 @@ class AppPalette extends ThemeExtension<AppPalette> {
   final Color borderLight;
   final Color textHeading;
   final Color textPrimary;
+  final Color textSecondary;
+  final Color textHint;
   final Color textDisabled;
 
   const AppPalette({
@@ -30,6 +32,8 @@ class AppPalette extends ThemeExtension<AppPalette> {
     required this.borderLight,
     required this.textHeading,
     required this.textPrimary,
+    required this.textSecondary,
+    required this.textHint,
     required this.textDisabled,
   });
 
@@ -43,6 +47,8 @@ class AppPalette extends ThemeExtension<AppPalette> {
     borderLight: Color(0xFFF1F5F9),
     textHeading: Color(0xFF0F172A),
     textPrimary: Color(0xFF1E293B),
+    textSecondary: Color(0xFF64748B),
+    textHint: Color(0xFF94A3B8),
     textDisabled: Color(0xFFCBD5E1),
   );
 
@@ -56,6 +62,8 @@ class AppPalette extends ThemeExtension<AppPalette> {
     borderLight: Color(0xFF273449),
     textHeading: Color(0xFFF1F5F9),
     textPrimary: Color(0xFFE2E8F0),
+    textSecondary: Color(0xFF94A3B8),
+    textHint: Color(0xFF64748B),
     textDisabled: Color(0xFF475569),
   );
 
@@ -69,6 +77,8 @@ class AppPalette extends ThemeExtension<AppPalette> {
     Color? borderLight,
     Color? textHeading,
     Color? textPrimary,
+    Color? textSecondary,
+    Color? textHint,
     Color? textDisabled,
   }) {
     return AppPalette(
@@ -80,6 +90,8 @@ class AppPalette extends ThemeExtension<AppPalette> {
       borderLight: borderLight ?? this.borderLight,
       textHeading: textHeading ?? this.textHeading,
       textPrimary: textPrimary ?? this.textPrimary,
+      textSecondary: textSecondary ?? this.textSecondary,
+      textHint: textHint ?? this.textHint,
       textDisabled: textDisabled ?? this.textDisabled,
     );
   }
@@ -96,6 +108,8 @@ class AppPalette extends ThemeExtension<AppPalette> {
       borderLight: Color.lerp(borderLight, other.borderLight, t)!,
       textHeading: Color.lerp(textHeading, other.textHeading, t)!,
       textPrimary: Color.lerp(textPrimary, other.textPrimary, t)!,
+      textSecondary: Color.lerp(textSecondary, other.textSecondary, t)!,
+      textHint: Color.lerp(textHint, other.textHint, t)!,
       textDisabled: Color.lerp(textDisabled, other.textDisabled, t)!,
     );
   }

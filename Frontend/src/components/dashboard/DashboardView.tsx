@@ -186,14 +186,14 @@ export function DashboardView() {
           image={fuelImg}
           onClick={goTo('fuel')}
           color="orange"
-          delay={0.3}
+          delay={0.2}
         />
         <KPICard
           title="Alertes"
           value={stats.maintenanceAlerts + stats.fuelAnomalies}
           icon={AlertTriangle}
           image={alertsImg}
-          onClick={goTo('reports')}
+          onClick={goTo('alerts')}
           color="orange"
           delay={0.4}
         />

@@ -74,4 +74,21 @@ class AppColors {
   // ─── Gradient helpers ─────────────────────────────────────────────────────
   static Color withAlpha(Color color, double opacity) =>
       color.withValues(alpha: opacity);
+
+  // ─── Design System v2 — Violet (nouvelle charte maquette) ────────────────
+  // Palette violet extraite de la maquette React (Tailwind violet-*)
+  static const Color violet        = Color(0xFF7C3AED); // violet-600 — couleur primaire v2
+  static const Color violetDark    = Color(0xFF6D28D9); // violet-700 — gradient milieu
+  static const Color violetDeep    = Color(0xFF4C1D95); // violet-900 — gradient profond
+  static const Color violetLight   = Color(0xFFEDE9FE); // violet-50  — fond teinté
+  static const Color violetSoft    = Color(0xFFDDD6FE); // violet-100 — hover / chip
+  static const Color violetMuted   = Color(0xFFC4B5FD); // violet-300 — icônes sur fond violet
+  static const Color violetOnDark  = Color(0xFFDDD6FE); // violet-200 — textes secondaires sur header
+  static const Color violetSubOnDark = Color(0xFFA78BFA); // violet-400 — sub-textes sur header
+
+  // Fond d'écran de la nouvelle charte (lavande très pâle, remplace #F8FAFC)
+  static const Color appBgV2 = Color(0xFFF6F5FA);
+
+  // Texte heading de la maquette (#09090f — quasi-noir légèrement chaud)
+  static const Color textHeadingV2 = Color(0xFF09090F);
 }

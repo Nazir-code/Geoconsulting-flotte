@@ -158,9 +158,11 @@ app.post('/api/auth/login', async (req, res) => {
       });
       return;
     }
+    
 
     res.json(buildApiResponse(authResult, 'Connexion réussie.'));
   } catch (error) {
+
     handleRouteError(res, error, 401);
   }
 });

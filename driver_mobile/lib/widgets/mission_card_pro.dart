@@ -113,7 +113,8 @@ class _MissionCardProState extends State<MissionCardPro> {
                         Expanded(
                           child: Text(
                             widget.mission['location'] ?? 'Destination non définie',
-                            style: AppTextStyles.bodySm,
+                            style: AppTextStyles.bodySm
+                                .copyWith(color: context.palette.textSecondary),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -127,7 +128,8 @@ class _MissionCardProState extends State<MissionCardPro> {
                       const SizedBox(height: 6),
                       Text(
                         widget.mission['description'] as String,
-                        style: AppTextStyles.caption,
+                        style: AppTextStyles.caption
+                            .copyWith(color: context.palette.textSecondary),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -138,15 +140,17 @@ class _MissionCardProState extends State<MissionCardPro> {
                     // ── Footer ────────────────────────────────────────────────
                     Row(
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.schedule_rounded,
                           size: 13,
-                          color: AppColors.textHint,
+                          color: context.palette.textHint,
                         ),
                         const SizedBox(width: 5),
                         Text(
                           _formatDate(widget.mission['createdAt']),
-                          style: AppTextStyles.caption.copyWith(fontSize: 12),
+                          style: AppTextStyles.caption.copyWith(
+                              fontSize: 12,
+                              color: context.palette.textSecondary),
                         ),
                         const Spacer(),
                         Text(
@@ -155,6 +159,7 @@ class _MissionCardProState extends State<MissionCardPro> {
                             fontFamily: 'Inter',
                             fontSize: 11,
                             letterSpacing: 0.5,
+                            color: context.palette.textHint,
                           ),
                         ),
                       ],
@@ -163,7 +168,7 @@ class _MissionCardProState extends State<MissionCardPro> {
                     // ── Actions ───────────────────────────────────────────────
                     if (hasActions) ...[
                       const SizedBox(height: 14),
-                      const Divider(height: 1, color: AppColors.borderLight),
+                      Divider(height: 1, color: context.palette.borderLight),
                       const SizedBox(height: 14),
                       _buildActionRow(status),
                     ],
@@ -241,23 +246,29 @@ class _MissionCardProState extends State<MissionCardPro> {
       return SizedBox(
         width: double.infinity,
         height: 46,
-        child: ElevatedButton.icon(
-          onPressed: widget.onStart,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            foregroundColor: Colors.white,
-            elevation: 0,
-            shape: RoundedRectangleBorder(
+        child: GestureDetector(
+          onTap: widget.onStart,
+          behavior: HitTestBehavior.opaque,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: AppColors.primary,
               borderRadius: AppSpacing.roundedMd,
             ),
-          ),
-          icon: const Icon(Icons.play_arrow_rounded, size: 20),
-          label: const Text(
-            'Démarrer la mission',
-            style: TextStyle(
-              fontFamily: 'Inter',
-              fontWeight: FontWeight.w600,
-              fontSize: 14,
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.play_arrow_rounded, size: 20, color: Colors.white),
+                SizedBox(width: 8),
+                Text(
+                  'Démarrer la mission',
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -270,23 +281,29 @@ class _MissionCardProState extends State<MissionCardPro> {
           Expanded(
             child: SizedBox(
               height: 46,
-              child: ElevatedButton.icon(
-                onPressed: widget.onComplete,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.success,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
+              child: GestureDetector(
+                onTap: widget.onComplete,
+                behavior: HitTestBehavior.opaque,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: AppColors.success,
                     borderRadius: AppSpacing.roundedMd,
                   ),
-                ),
-                icon: const Icon(Icons.check_rounded, size: 18),
-                label: const Text(
-                  'Terminer',
-                  style: TextStyle(
-                    fontFamily: 'Inter',
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.check_rounded, size: 18, color: Colors.white),
+                      SizedBox(width: 8),
+                      Text(
+                        'Terminer',
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -296,22 +313,29 @@ class _MissionCardProState extends State<MissionCardPro> {
           Expanded(
             child: SizedBox(
               height: 46,
-              child: OutlinedButton.icon(
-                onPressed: widget.onCancel,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.error,
-                  side: const BorderSide(color: AppColors.error, width: 1.5),
-                  shape: RoundedRectangleBorder(
+              child: GestureDetector(
+                onTap: widget.onCancel,
+                behavior: HitTestBehavior.opaque,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: AppColors.error, width: 1.5),
                     borderRadius: AppSpacing.roundedMd,
                   ),
-                ),
-                icon: const Icon(Icons.stop_rounded, size: 18),
-                label: const Text(
-                  'Arrêter',
-                  style: TextStyle(
-                    fontFamily: 'Inter',
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.stop_rounded, size: 18, color: AppColors.error),
+                      SizedBox(width: 8),
+                      Text(
+                        'Arrêter',
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                          color: AppColors.error,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),

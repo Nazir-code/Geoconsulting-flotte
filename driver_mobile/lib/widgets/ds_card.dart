@@ -61,9 +61,9 @@ class _DsCardState extends State<DsCard> {
     final effectiveColor = widget.gradient != null
         ? Colors.transparent
         : (widget.color ?? cs.surface);
-    final effectiveShadow = widget.shadow ?? AppTheme.shadowSm;
-    final effectiveBorder =
-        widget.border ?? Border.all(color: cs.outlineVariant, width: 1);
+    final effectiveShadow = widget.shadow ?? AppTheme.shadowCard;
+    final effectiveBorder = widget.border ??
+        Border.all(color: const Color(0x0E000000), width: 1);
 
     final card = Container(
       width: widget.width,

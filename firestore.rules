@@ -111,6 +111,23 @@ service cloud.firestore {
       allow read, create, update, delete: if isAuthenticated() && isManager();
     }
 
+    // Collection: notifications (notifications destinées aux chauffeurs)
+    match /notifications/{notificationId} {
+      // Lecture d'une notification unique ou d'une liste filtrée par userId.
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isManager());
+
+      // Mise à jour autorisée uniquement pour la marque comme lue du propriétaire ou pour les managers.
+      allow update: if isAuthenticated() && (
+        isManager() ||
+        (resource.data.userId == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead'])
+          && request.resource.data.isRead == true)
+      );
+
+      // Les notifications sont créées par le backend/admin SDK uniquement.
+      allow create, delete: if isAuthenticated() && isManager();
+    }
+
     // Sécurité par défaut : Refuser tout le reste
     match /{document=**} {
       allow read, write: if false;

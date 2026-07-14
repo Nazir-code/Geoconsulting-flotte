@@ -7,6 +7,7 @@ import 'profile_screen.dart';
 import 'notifications_screen.dart';
 import '../theme/app_theme.dart';
 import '../services/network_service.dart';
+import '../widgets/animated_bottom_nav.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key});
@@ -15,23 +16,51 @@ class MainNavigationScreen extends StatefulWidget {
   State<MainNavigationScreen> createState() => _MainNavigationScreenState();
 }
 
-class _MainNavigationScreenState extends State<MainNavigationScreen> {
+class _MainNavigationScreenState extends State<MainNavigationScreen>
+    with SingleTickerProviderStateMixin {
   int _selectedIndex = 0;
   final NetworkService _networkService = NetworkService();
 
   static const int _notifCount = 2;
 
-  static final List<Widget> _pages = [
-    const DriverHome(),
-    const TrackingScreen(),
-    const MissionsScreen(),
-    const NotificationsScreen(),
-    const ProfileScreen(),
-  ];
+  // Pages créées à la demande : seul DriverHome est instancié au démarrage.
+  // TrackingScreen (GPS + compass) n'est créé que quand l'utilisateur visite
+  // l'onglet Carte pour la première fois — supprime le double stream GPS.
+  final List<Widget?> _pageCache = List.filled(5, null);
+
+  // Fade-in doux lors du changement d'onglet.
+  late final AnimationController _tabFadeCtrl;
+
+  static Widget _buildPage(int index) => switch (index) {
+    0 => const DriverHome(),
+    1 => const TrackingScreen(),
+    2 => const MissionsScreen(),
+    3 => const NotificationsScreen(),
+    _ => const ProfileScreen(),
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _tabFadeCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 160),
+      value: 1.0,
+    );
+    _pageCache[0] = _buildPage(0);
+  }
+
+  @override
+  void dispose() {
+    _tabFadeCtrl.dispose();
+    super.dispose();
+  }
 
   void _onItemTapped(int index) {
     if (_selectedIndex == index) return;
     HapticFeedback.selectionClick();
+    _pageCache[index] ??= _buildPage(index);
+    _tabFadeCtrl.forward(from: 0.0);
     setState(() => _selectedIndex = index);
   }
 
@@ -48,9 +77,18 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             },
           ),
           Expanded(
-            child: IndexedStack(
-              index: _selectedIndex,
-              children: _pages,
+            child: FadeTransition(
+              opacity: CurvedAnimation(
+                parent: _tabFadeCtrl,
+                curve: Curves.easeOut,
+              ),
+              child: IndexedStack(
+                index: _selectedIndex,
+                children: List.generate(
+                  5,
+                  (i) => _pageCache[i] ?? const SizedBox.shrink(),
+                ),
+              ),
             ),
           ),
         ],
@@ -60,58 +98,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   }
 
   Widget _buildBottomNav() {
-    return Container(
-      decoration: BoxDecoration(
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 24,
-            offset: const Offset(0, -6),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        child: NavigationBar(
-          selectedIndex: _selectedIndex,
-          onDestinationSelected: _onItemTapped,
-          height: 70,
-          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-          destinations: [
-            const NavigationDestination(
-              icon: Icon(Icons.home_outlined),
-              selectedIcon: Icon(Icons.home_rounded),
-              label: 'Accueil',
-            ),
-            const NavigationDestination(
-              icon: Icon(Icons.map_outlined),
-              selectedIcon: Icon(Icons.map_rounded),
-              label: 'Carte',
-            ),
-            const NavigationDestination(
-              icon: Icon(Icons.assignment_outlined),
-              selectedIcon: Icon(Icons.assignment_rounded),
-              label: 'Missions',
-            ),
-            NavigationDestination(
-              icon: Badge(
-                label: Text('$_notifCount'),
-                child: const Icon(Icons.notifications_none_rounded),
-              ),
-              selectedIcon: Badge(
-                label: Text('$_notifCount'),
-                child: const Icon(Icons.notifications_rounded),
-              ),
-              label: 'Alertes',
-            ),
-            const NavigationDestination(
-              icon: Icon(Icons.person_outline_rounded),
-              selectedIcon: Icon(Icons.person_rounded),
-              label: 'Profil',
-            ),
-          ],
-        ),
-      ),
+    return AnimatedBottomNav.defaults(
+      selectedIndex: _selectedIndex,
+      onTap: _onItemTapped,
+      notifCount: _notifCount,
     );
   }
 }

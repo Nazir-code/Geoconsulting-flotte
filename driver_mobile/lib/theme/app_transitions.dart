@@ -1,5 +1,41 @@
 import 'package:flutter/material.dart';
 
+/// Transition "smooth mou" — fondu + léger glissement vers le haut (4 %).
+/// Utilisée via [pageTransitionsTheme] dans les deux thèmes de l'app,
+/// s'applique automatiquement à tout [MaterialPageRoute].
+class SoftFadeUpTransitionsBuilder extends PageTransitionsBuilder {
+  const SoftFadeUpTransitionsBuilder();
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    // Page entrante : fondu + léger drift vers le haut
+    final fadeIn = CurvedAnimation(parent: animation, curve: Curves.easeOut);
+    final slideIn = Tween<Offset>(
+      begin: const Offset(0.0, 0.04),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic));
+
+    // Page sortante (en arrière-plan) : léger recul + assombrissement
+    final fadeOut = Tween<double>(begin: 1.0, end: 0.96).animate(
+      CurvedAnimation(parent: secondaryAnimation, curve: Curves.easeIn),
+    );
+
+    return FadeTransition(
+      opacity: fadeOut,
+      child: FadeTransition(
+        opacity: fadeIn,
+        child: SlideTransition(position: slideIn, child: child),
+      ),
+    );
+  }
+}
+
 abstract class AppTransitions {
   // Slide depuis la droite + fade — navigation standard (sous-pages)
   static PageRoute<T> slideRight<T>(Widget page) {

@@ -113,6 +113,17 @@ class ApiService {
     return Mission.fromJson(response as Map<String, dynamic>);
   }
 
+  Future<Mission> cancelMission({
+    required String missionId,
+    String reason = '',
+  }) async {
+    final response = await _post(
+      '/api/driver/me/missions/$missionId/cancel',
+      body: {'reason': reason},
+    );
+    return Mission.fromJson(response as Map<String, dynamic>);
+  }
+
   Future<FuelRecord> createFuelRecord({
     required num quantity,
     required num pricePerLiter,

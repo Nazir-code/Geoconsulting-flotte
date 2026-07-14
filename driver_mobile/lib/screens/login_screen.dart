@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
-import '../theme/app_transitions.dart';
 import 'register_screen.dart';
 import 'forgot_password_screen.dart';
 
@@ -24,44 +22,28 @@ class _LoginScreenState extends State<LoginScreen>
   bool _obscurePassword = true;
   String? _errorMessage;
 
-  late final AnimationController _ctrl;
-  late final Animation<double> _headerAnim;
-  late final Animation<double> _sheetFadeAnim;
-  late final Animation<Offset> _sheetSlideAnim;
+  late final AnimationController _fadeCtrl;
+  late final Animation<double> _fadeAnim;
 
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(
+    _fadeCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 700),
+      duration: const Duration(milliseconds: 600),
     )..forward();
-
-    _headerAnim = CurvedAnimation(
-      parent: _ctrl,
-      curve: const Interval(0.0, 0.65, curve: Curves.easeOut),
-    );
-    _sheetFadeAnim = CurvedAnimation(
-      parent: _ctrl,
-      curve: const Interval(0.15, 0.8, curve: Curves.easeOut),
-    );
-    _sheetSlideAnim = Tween<Offset>(
-      begin: const Offset(0, 0.06),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _ctrl,
-      curve: const Interval(0.2, 1.0, curve: Curves.easeOutCubic),
-    ));
+    _fadeAnim = CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOut);
   }
 
   @override
   void dispose() {
-    _ctrl.dispose();
+    _fadeCtrl.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
+  // ── Firebase auth — INCHANGÉ ──────────────────────────────────────────────
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() {
@@ -82,196 +64,124 @@ class _LoginScreenState extends State<LoginScreen>
 
   @override
   Widget build(BuildContext context) {
-    final topPad = MediaQuery.of(context).padding.top;
-    final bottomPad = MediaQuery.of(context).padding.bottom;
-
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.light,
-      child: Scaffold(
-        backgroundColor: AppColors.primaryDark,
-        body: Column(
-          children: [
-            // ── Header gradient ───────────────────────────────────────────────
-            FadeTransition(
-              opacity: _headerAnim,
-              child: Container(
-                width: double.infinity,
-                decoration: const BoxDecoration(gradient: AppTheme.primaryGradient),
-                padding: EdgeInsets.fromLTRB(28, topPad + 44, 28, 52),
-                child: _buildHero(),
-              ),
-            ),
-            // ── Sheet blanc ───────────────────────────────────────────────────
-            Expanded(
-              child: SlideTransition(
-                position: _sheetSlideAnim,
-                child: FadeTransition(
-                  opacity: _sheetFadeAnim,
-                  child: Container(
-                    decoration: const BoxDecoration(
-                      color: AppColors.background,
-                      borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-                    ),
-                    child: SingleChildScrollView(
-                      padding: EdgeInsets.fromLTRB(24, 32, 24, bottomPad + 24),
-                      child: Form(
-                        key: _formKey,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Text("Connectez-vous", style: AppTextStyles.h3),
-                            const SizedBox(height: 4),
-                            Text(
-                              "Entrez vos identifiants pour continuer",
-                              style: AppTextStyles.bodySm,
-                            ),
-                            const SizedBox(height: 28),
-                            if (_errorMessage != null) ...[
-                              _buildErrorBanner(),
-                              const SizedBox(height: 20),
-                            ],
-                            _fieldLabel("ADRESSE EMAIL"),
-                            TextFormField(
-                              controller: _emailController,
-                              keyboardType: TextInputType.emailAddress,
-                              textInputAction: TextInputAction.next,
-                              autocorrect: false,
-                              style: AppTextStyles.body
-                                  .copyWith(fontWeight: FontWeight.w500),
-                              decoration: const InputDecoration(
-                                hintText: "chauffeur@geoconsulting.com",
-                                prefixIcon: Icon(Icons.email_outlined),
-                              ),
-                              validator: (v) => (v ?? '').isEmpty
-                                  ? "Veuillez entrer votre email"
-                                  : null,
-                            ),
-                            const SizedBox(height: 20),
-                            _fieldLabel("MOT DE PASSE"),
-                            TextFormField(
-                              controller: _passwordController,
-                              obscureText: _obscurePassword,
-                              textInputAction: TextInputAction.done,
-                              onFieldSubmitted: (_) => _handleLogin(),
-                              style: AppTextStyles.body
-                                  .copyWith(fontWeight: FontWeight.w500),
-                              decoration: InputDecoration(
-                                hintText: "••••••••",
-                                prefixIcon:
-                                    const Icon(Icons.lock_outline_rounded),
-                                suffixIcon: IconButton(
-                                  icon: Icon(
-                                    _obscurePassword
-                                        ? Icons.visibility_off_outlined
-                                        : Icons.visibility_outlined,
-                                    size: 20,
-                                  ),
-                                  color: AppColors.textSecondary,
-                                  onPressed: () => setState(
-                                      () => _obscurePassword = !_obscurePassword),
-                                ),
-                              ),
-                              validator: (v) => (v ?? '').length < 6
-                                  ? "Minimum 6 caractères"
-                                  : null,
-                            ),
-                            const SizedBox(height: 4),
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: TextButton(
-                                onPressed: () => Navigator.push(
-                                  context,
-                                  AppTransitions.slideRight(
-                                      const ForgotPasswordScreen()),
-                                ),
-                                style: TextButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 4, vertical: 4),
-                                ),
-                                child: Text(
-                                  "Mot de passe oublié ?",
-                                  style: AppTextStyles.labelSm.copyWith(
-                                    color: AppColors.primary,
-                                    letterSpacing: 0.2,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-                            _buildSubmitButton(),
-                            const SizedBox(height: 28),
-                            _buildFooter(),
-                          ],
-                        ),
-                      ),
-                    ),
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Stack(
+        children: [
+          _buildBackground(),
+          SafeArea(
+            child: FadeTransition(
+              opacity: _fadeAnim,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildHero(),
+                      const SizedBox(height: 40),
+                      if (_errorMessage != null) ...[
+                        _buildErrorBanner(),
+                        const SizedBox(height: 20),
+                      ],
+                      _buildFormCard(),
+                      const SizedBox(height: 28),
+                      _buildSubmitButton(),
+                      const SizedBox(height: 32),
+                      _buildFooter(),
+                    ],
                   ),
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  // ── Hero (sur le header gradient) ─────────────────────────────────────────
-  Widget _buildHero() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  // ── Cercles décoratifs violet ─────────────────────────────────────────────
+  Widget _buildBackground() {
+    return Stack(
       children: [
-        Container(
-          width: 64,
-          height: 64,
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.3),
-              width: 1.5,
-            ),
-          ),
-          child: Center(
-            child: Image.asset(
-              'assets/images/logo_geoconsulting.png',
-              width: 36,
-              height: 36,
-              fit: BoxFit.contain,
-              errorBuilder: (context, error, _) => const Icon(
-                Icons.local_shipping_rounded,
-                color: Colors.white,
-                size: 34,
-              ),
+        Positioned(
+          top: -80,
+          right: -80,
+          child: Container(
+            width: 260,
+            height: 260,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppColors.violetLight.withValues(alpha: 0.60),
             ),
           ),
         ),
-        const SizedBox(height: 20),
-        const Text(
-          "Geoconsulting",
-          style: TextStyle(
-            fontFamily: 'Inter',
-            fontSize: 28,
-            fontWeight: FontWeight.w800,
-            color: Colors.white,
-            letterSpacing: -0.5,
+        Positioned(
+          top: 80,
+          right: 20,
+          child: Container(
+            width: 110,
+            height: 110,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppColors.violetSoft.withValues(alpha: 0.40),
+            ),
           ),
         ),
-        const SizedBox(height: 6),
-        Text(
-          "Espace Chauffeur",
-          style: TextStyle(
-            fontFamily: 'Inter',
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: Colors.white.withValues(alpha: 0.75),
-            letterSpacing: 1.2,
+        Positioned(
+          bottom: -60,
+          right: -40,
+          child: Container(
+            width: 180,
+            height: 180,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppColors.violetLight.withValues(alpha: 0.30),
+            ),
           ),
         ),
       ],
     );
   }
 
-  // ── Bannière d'erreur ──────────────────────────────────────────────────────
+  // ── Icône voiture + titre ─────────────────────────────────────────────────
+  Widget _buildHero() {
+    return Column(
+      children: [
+        Container(
+          width: 72,
+          height: 72,
+          decoration: BoxDecoration(
+            gradient: AppTheme.violetButtonGradient,
+            borderRadius: BorderRadius.circular(22),
+            boxShadow: AppTheme.shadowViolet,
+          ),
+          child: const Icon(
+            Icons.directions_car_rounded,
+            color: Colors.white,
+            size: 32,
+          ),
+        ),
+        const SizedBox(height: 22),
+        Text(
+          'Geoconsulting Fleet',
+          style: AppTextStyles.jkHeroName.copyWith(
+            color: AppColors.textHeadingV2,
+            fontSize: 20,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Bienvenue, connectez-vous pour continuer',
+          style: AppTextStyles.jkCardSub,
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+
+  // ── Bannière erreur (inchangée) ───────────────────────────────────────────
   Widget _buildErrorBanner() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -293,23 +203,136 @@ class _LoginScreenState extends State<LoginScreen>
           ),
           GestureDetector(
             onTap: () => setState(() => _errorMessage = null),
-            child:
-                const Icon(Icons.close_rounded, color: AppColors.error, size: 18),
+            child: const Icon(Icons.close_rounded,
+                color: AppColors.error, size: 18),
           ),
         ],
       ),
     );
   }
 
-  // ── Bouton de connexion ────────────────────────────────────────────────────
+  // ── Champs (sans carte) ───────────────────────────────────────────────────
+  Widget _buildFormCard() {
+    const inputRadius = BorderRadius.all(Radius.circular(14));
+    const inputFill = Color(0xFFF9FAFB);
+    final focusBorder = OutlineInputBorder(
+      borderRadius: inputRadius,
+      borderSide: BorderSide(color: AppColors.violet, width: 1.5),
+    );
+    final errBorder = OutlineInputBorder(
+      borderRadius: inputRadius,
+      borderSide: BorderSide(color: AppColors.error, width: 1.5),
+    );
+    const noBorder = OutlineInputBorder(
+      borderRadius: inputRadius,
+      borderSide: BorderSide.none,
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Email
+        _fieldLabel('ADRESSE EMAIL'),
+        TextFormField(
+          controller: _emailController,
+          keyboardType: TextInputType.emailAddress,
+          textInputAction: TextInputAction.next,
+          autocorrect: false,
+          style: AppTextStyles.jkCardTitle.copyWith(fontWeight: FontWeight.w500),
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: inputFill,
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            hintText: 'chauffeur@geoconsulting.com',
+            hintStyle:
+                AppTextStyles.jkCardSub.copyWith(color: AppColors.textHint),
+            prefixIcon: const Icon(Icons.email_outlined,
+                size: 18, color: AppColors.textSecondary),
+            border: noBorder,
+            enabledBorder: noBorder,
+            focusedBorder: focusBorder,
+            errorBorder: errBorder,
+            focusedErrorBorder: errBorder,
+          ),
+          validator: (v) =>
+              (v ?? '').isEmpty ? 'Veuillez entrer votre email' : null,
+        ),
+        const SizedBox(height: 20),
+
+        // Mot de passe
+        _fieldLabel('MOT DE PASSE'),
+        TextFormField(
+          controller: _passwordController,
+          obscureText: _obscurePassword,
+          textInputAction: TextInputAction.done,
+          onFieldSubmitted: (_) => _handleLogin(),
+          style: AppTextStyles.jkCardTitle.copyWith(fontWeight: FontWeight.w500),
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: inputFill,
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            hintText: '••••••••',
+            hintStyle:
+                AppTextStyles.jkCardSub.copyWith(color: AppColors.textHint),
+            prefixIcon: const Icon(Icons.lock_outline_rounded,
+                size: 18, color: AppColors.textSecondary),
+            suffixIcon: IconButton(
+              icon: Icon(
+                _obscurePassword
+                    ? Icons.visibility_off_outlined
+                    : Icons.visibility_outlined,
+                size: 18,
+              ),
+              color: AppColors.textSecondary,
+              onPressed: () =>
+                  setState(() => _obscurePassword = !_obscurePassword),
+            ),
+            border: noBorder,
+            enabledBorder: noBorder,
+            focusedBorder: focusBorder,
+            errorBorder: errBorder,
+            focusedErrorBorder: errBorder,
+          ),
+          validator: (v) =>
+              (v ?? '').length < 6 ? 'Minimum 6 caractères' : null,
+        ),
+        const SizedBox(height: 4),
+
+        // Mot de passe oublié
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => const ForgotPasswordScreen()),
+            ),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+            ),
+            child: Text('Mot de passe oublié ?', style: AppTextStyles.jkLink),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Bouton connexion violet ───────────────────────────────────────────────
   Widget _buildSubmitButton() {
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
       height: 54,
       decoration: BoxDecoration(
-        gradient: _isLoading ? null : AppTheme.primaryGradient,
-        color: _isLoading ? AppColors.primary : null,
+        gradient: _isLoading
+            ? LinearGradient(colors: [
+                AppColors.violet.withValues(alpha: 0.70),
+                AppColors.violetDark.withValues(alpha: 0.70),
+              ])
+            : AppTheme.violetButtonGradient,
         borderRadius: AppSpacing.roundedLg,
-        boxShadow: _isLoading ? null : AppTheme.shadowColored(AppColors.primary),
+        boxShadow: _isLoading ? [] : AppTheme.shadowViolet,
       ),
       child: ElevatedButton(
         onPressed: _isLoading ? null : _handleLogin,
@@ -321,59 +344,62 @@ class _LoginScreenState extends State<LoginScreen>
         ),
         child: _isLoading
             ? const SizedBox(
-                width: 22,
-                height: 22,
+                width: 20,
+                height: 20,
                 child: CircularProgressIndicator(
-                    color: Colors.white, strokeWidth: 2.5),
+                  color: Colors.white,
+                  strokeWidth: 2.5,
+                ),
               )
             : Text(
-                "SE CONNECTER",
-                style: AppTextStyles.btnLg.copyWith(
-                  color: Colors.white,
-                  letterSpacing: 1,
-                ),
+                'SE CONNECTER',
+                style: AppTextStyles.jkBtnPrimary.copyWith(letterSpacing: 0.8),
               ),
       ),
     );
   }
 
-  // ── Footer ─────────────────────────────────────────────────────────────────
+  // ── Footer (liens navigation) ─────────────────────────────────────────────
   Widget _buildFooter() {
     return Column(
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text("Nouveau chauffeur ?", style: AppTextStyles.body),
+            Text('Nouveau chauffeur ?', style: AppTextStyles.bodySm),
             TextButton(
               onPressed: () => Navigator.push(
                 context,
-                AppTransitions.slideRight(const RegisterScreen()),
+                MaterialPageRoute(builder: (_) => const RegisterScreen()),
               ),
-              child: Text(
-                "Créer un compte",
-                style: AppTextStyles.label.copyWith(color: AppColors.primary),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
               ),
+              child: Text('Créer un compte', style: AppTextStyles.jkLink),
             ),
           ],
         ),
         const SizedBox(height: 8),
         Text(
-          "FleetNexus · NOVATECH © 2026",
-          style: AppTextStyles.caption.copyWith(color: AppColors.textHint),
+          'FleetNexus · NOVATECH © 2026',
+          style: AppTextStyles.jkVersion.copyWith(color: AppColors.textHint),
           textAlign: TextAlign.center,
         ),
       ],
     );
   }
 
-  // ── Label de champ ─────────────────────────────────────────────────────────
+  // ── Label de champ ────────────────────────────────────────────────────────
   Widget _fieldLabel(String text) {
     return Padding(
       padding: const EdgeInsets.only(left: 4, bottom: 8),
       child: Text(
         text,
-        style: AppTextStyles.overline.copyWith(color: AppColors.textSecondary),
+        style: AppTextStyles.jkBadge.copyWith(
+          color: AppColors.textSecondary,
+          fontSize: 10,
+          letterSpacing: 0.8,
+        ),
       ),
     );
   }

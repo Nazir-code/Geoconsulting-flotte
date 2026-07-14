@@ -90,15 +90,10 @@ class MissionStatusService {
   /// Cancel a mission with a reason
   Future<Mission> cancelMission(String missionId, String reason) async {
     try {
-      // Create a custom API call for mission cancellation
-      final response = await _apiService._post(
-        '/api/driver/me/missions/$missionId/cancel',
-        body: {
-          'reason': reason,
-        },
+      final mission = await _apiService.cancelMission(
+        missionId: missionId,
+        reason: reason,
       );
-      
-      final mission = Mission.fromJson(response as Map<String, dynamic>);
       
       // Emit real-time update
       _missionUpdateController.add(mission);
@@ -154,11 +149,9 @@ class MissionStatusService {
               );
               break;
             case MissionAction.cancel:
-              await _apiService._post(
-                '/api/driver/me/missions/${update.missionId}/cancel',
-                body: {
-                  'reason': update.reason ?? 'Cancelled offline',
-                },
+              await _apiService.cancelMission(
+                missionId: update.missionId,
+                reason: update.reason ?? 'Cancelled offline',
               );
               break;
           }

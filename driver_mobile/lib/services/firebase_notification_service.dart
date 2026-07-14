@@ -34,6 +34,7 @@ class FirebaseNotificationService {
   }
 
   Future<void> startForDriver(String driverUid) async {
+    if (_activeDriverUid == driverUid) return;
     _activeDriverUid = driverUid;
     print('🚀 [FCM SERVICE] Démarrage pour driver: $driverUid');
     

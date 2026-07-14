@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../services/firestore_service.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
@@ -10,7 +11,8 @@ class MaintenanceRequestScreen extends StatefulWidget {
   const MaintenanceRequestScreen({super.key, this.driverName});
 
   @override
-  State<MaintenanceRequestScreen> createState() => _MaintenanceRequestScreenState();
+  State<MaintenanceRequestScreen> createState() =>
+      _MaintenanceRequestScreenState();
 }
 
 const _maintenanceTypes = [
@@ -25,6 +27,7 @@ const _maintenanceTypes = [
 ];
 
 class _MaintenanceRequestScreenState extends State<MaintenanceRequestScreen> {
+  // ── Services + contrôleurs — INCHANGÉS ───────────────────────────────────
   final FirestoreService _firestore = FirestoreService();
   final AuthService _auth = AuthService();
 
@@ -50,6 +53,7 @@ class _MaintenanceRequestScreenState extends State<MaintenanceRequestScreen> {
     super.dispose();
   }
 
+  // ── Firestore — INCHANGÉ ──────────────────────────────────────────────────
   Future<void> _loadVehicles() async {
     final list = await _firestore.getVehicles();
     if (!mounted) return;
@@ -65,9 +69,12 @@ class _MaintenanceRequestScreenState extends State<MaintenanceRequestScreen> {
   }
 
   Future<void> _submit() async {
-    if (_selectedVehicleId == null || _descriptionCtrl.text.trim().isEmpty) {
+    if (_selectedVehicleId == null ||
+        _descriptionCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Véhicule et description sont obligatoires.')),
+        const SnackBar(
+          content: Text('Véhicule et description sont obligatoires.'),
+        ),
       );
       return;
     }
@@ -79,7 +86,8 @@ class _MaintenanceRequestScreenState extends State<MaintenanceRequestScreen> {
         vehiclePlate: _plateOf(_selectedVehicleId!),
         type: _selectedType,
         description: _descriptionCtrl.text.trim(),
-        mileage: double.tryParse(_mileageCtrl.text.trim().replaceAll(',', '.')),
+        mileage: double.tryParse(
+            _mileageCtrl.text.trim().replaceAll(',', '.')),
         driverId: _auth.currentUid,
         driverName: widget.driverName,
       );
@@ -94,7 +102,9 @@ class _MaintenanceRequestScreenState extends State<MaintenanceRequestScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur : $e'), backgroundColor: AppColors.error),
+        SnackBar(
+            content: Text('Erreur : $e'),
+            backgroundColor: AppColors.error),
       );
     } finally {
       if (mounted) setState(() => _submitting = false);
@@ -104,15 +114,31 @@ class _MaintenanceRequestScreenState extends State<MaintenanceRequestScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: context.palette.background,
+      backgroundColor: AppColors.appBgV2,
       appBar: AppBar(
-        title: const Text('Signaler un entretien'),
-        backgroundColor: context.palette.surface,
-        foregroundColor: context.palette.textHeading,
+        title: Text(
+          'Signaler un entretien',
+          style: AppTextStyles.jkScreenTitle.copyWith(
+            color: AppColors.textHeadingV2,
+          ),
+        ),
+        backgroundColor: Colors.white,
+        foregroundColor: AppColors.textHeadingV2,
+        surfaceTintColor: Colors.transparent,
         elevation: 0,
+        systemOverlayStyle: SystemUiOverlayStyle.dark,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(height: 1, color: const Color(0x0E000000)),
+        ),
       ),
       body: _loadingVehicles
-          ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+          ? const Center(
+              child: CircularProgressIndicator(
+                color: AppColors.violet,
+                strokeWidth: 2.5,
+              ),
+            )
           : SingleChildScrollView(
               padding: const EdgeInsets.all(20),
               child: Column(
@@ -127,18 +153,23 @@ class _MaintenanceRequestScreenState extends State<MaintenanceRequestScreen> {
                         .map((v) => DropdownMenuItem<String>(
                               value: v['id'] as String,
                               child: Text(
-                                '${v['plateNumber'] ?? '—'} · ${v['brand'] ?? ''} ${v['model'] ?? ''}',
+                                '${v['plateNumber'] ?? '—'} · '
+                                '${v['brand'] ?? ''} ${v['model'] ?? ''}',
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ))
                         .toList(),
-                    onChanged: (val) => setState(() => _selectedVehicleId = val),
+                    onChanged: (val) =>
+                        setState(() => _selectedVehicleId = val),
                   ),
                   if (_vehicles.isEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: 6),
-                      child: Text('Aucun véhicule disponible.',
-                          style: AppTextStyles.caption.copyWith(color: AppColors.error)),
+                      child: Text(
+                        'Aucun véhicule disponible.',
+                        style: AppTextStyles.caption
+                            .copyWith(color: AppColors.error),
+                      ),
                     ),
                   const SizedBox(height: 16),
                   _label("Type d'entretien"),
@@ -147,25 +178,31 @@ class _MaintenanceRequestScreenState extends State<MaintenanceRequestScreen> {
                     isExpanded: true,
                     decoration: _dec('Type'),
                     items: _maintenanceTypes
-                        .map((t) => DropdownMenuItem<String>(value: t, child: Text(t)))
+                        .map((t) =>
+                            DropdownMenuItem<String>(value: t, child: Text(t)))
                         .toList(),
-                    onChanged: (val) => setState(() => _selectedType = val ?? _selectedType),
+                    onChanged: (val) =>
+                        setState(() => _selectedType = val ?? _selectedType),
                   ),
                   const SizedBox(height: 16),
                   _label('Description du problème'),
                   TextField(
                     controller: _descriptionCtrl,
                     maxLines: 4,
-                    decoration: _dec('Ex : bruit anormal au freinage, voyant moteur allumé…'),
+                    decoration: _dec(
+                        'Ex : bruit anormal au freinage, voyant moteur allumé…'),
                   ),
                   const SizedBox(height: 16),
                   _label('Kilométrage (optionnel)'),
                   TextField(
                     controller: _mileageCtrl,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
                     decoration: _dec('125000'),
                   ),
                   const SizedBox(height: 24),
+
+                  // Bouton rouge — conservé : sémantique alerte maintenance
                   SizedBox(
                     height: 52,
                     child: ElevatedButton(
@@ -173,14 +210,24 @@ class _MaintenanceRequestScreenState extends State<MaintenanceRequestScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.error,
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: AppSpacing.roundedLg),
+                        disabledBackgroundColor:
+                            AppColors.error.withValues(alpha: 0.6),
+                        elevation: 0,
+                        shadowColor: Colors.transparent,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: AppSpacing.roundedLg),
                       ),
                       child: _submitting
                           ? const SizedBox(
-                              width: 20, height: 20,
-                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                          : Text('Envoyer la demande',
-                              style: AppTextStyles.btnLg.copyWith(fontSize: 15, letterSpacing: 0)),
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                  color: Colors.white, strokeWidth: 2),
+                            )
+                          : Text(
+                              'Envoyer la demande',
+                              style: AppTextStyles.jkBtnPrimary,
+                            ),
                     ),
                   ),
                 ],
@@ -191,15 +238,23 @@ class _MaintenanceRequestScreenState extends State<MaintenanceRequestScreen> {
 
   Widget _label(String text) => Padding(
         padding: const EdgeInsets.only(bottom: 6),
-        child: Text(text,
-            style: AppTextStyles.label.copyWith(color: AppColors.textSecondary)),
+        child: Text(
+          text,
+          style: AppTextStyles.jkBadge.copyWith(
+            color: AppColors.textSecondary,
+            fontSize: 10,
+            letterSpacing: 0.8,
+          ),
+        ),
       );
 
   InputDecoration _dec(String hint) => InputDecoration(
         hintText: hint,
+        hintStyle: AppTextStyles.jkCardSub.copyWith(color: AppColors.textHint),
         filled: true,
         fillColor: context.palette.surface,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         border: OutlineInputBorder(
           borderRadius: AppSpacing.roundedMd,
           borderSide: BorderSide(color: context.palette.border),
@@ -210,7 +265,7 @@ class _MaintenanceRequestScreenState extends State<MaintenanceRequestScreen> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: AppSpacing.roundedMd,
-          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+          borderSide: const BorderSide(color: AppColors.violet, width: 1.5),
         ),
       );
 }

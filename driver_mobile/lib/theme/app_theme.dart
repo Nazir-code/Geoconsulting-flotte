@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'app_colors.dart';
+import 'app_palette.dart';
+import 'app_transitions.dart';
 
 export 'app_colors.dart';
 export 'app_text_styles.dart';
 export 'app_spacing.dart';
 export 'app_transitions.dart';
+export 'app_palette.dart';
 
 class AppTheme {
   // ─── Legacy static aliases (backward compat) ────────────────────────────
@@ -84,6 +87,52 @@ class AppTheme {
     end: Alignment.bottomCenter,
   );
 
+  // ─── Design System v2 — Gradients Violet ─────────────────────────────────
+  // Gradient fort utilisé dans les headers Dashboard + Profil de la maquette
+  static const LinearGradient violetHeaderGradient = LinearGradient(
+    colors: [
+      AppColors.violet,
+      AppColors.violetDark,
+      AppColors.violetDeep,
+    ],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  // Gradient compact pour les boutons CTA primaires
+  static const LinearGradient violetButtonGradient = LinearGradient(
+    colors: [AppColors.violet, AppColors.violetDark],
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
+  );
+
+  // Ombre colorée violet — éléments flottants et boutons CTA
+  static List<BoxShadow> get shadowViolet => [
+    BoxShadow(
+      color: AppColors.violet.withValues(alpha: 0.28),
+      blurRadius: 20,
+      offset: const Offset(0, 8),
+    ),
+  ];
+
+  // Ombre colorée violet légère — cards et éléments secondaires
+  static List<BoxShadow> get shadowVioletSm => [
+    BoxShadow(
+      color: AppColors.violet.withValues(alpha: 0.18),
+      blurRadius: 8,
+      offset: const Offset(0, 3),
+    ),
+  ];
+
+  // Ombre ultra-légère pour les cards de la nouvelle charte (quasi-invisible)
+  static List<BoxShadow> get shadowCard => [
+    BoxShadow(
+      color: Colors.black.withValues(alpha: 0.055),
+      blurRadius: 6,
+      offset: const Offset(0, 2),
+    ),
+  ];
+
   // ─── Light Theme ─────────────────────────────────────────────────────────
   static ThemeData get lightTheme {
     final colorScheme = ColorScheme(
@@ -119,6 +168,13 @@ class AppTheme {
       colorScheme: colorScheme,
       scaffoldBackgroundColor: AppColors.background,
       fontFamily: 'Inter',
+      extensions: const [AppPalette.light],
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: SoftFadeUpTransitionsBuilder(),
+          TargetPlatform.iOS: SoftFadeUpTransitionsBuilder(),
+        },
+      ),
 
       // ── AppBar ────────────────────────────────────────────────────────────
       appBarTheme: AppBarTheme(
@@ -298,17 +354,6 @@ class AppTheme {
       // ── ListTile ──────────────────────────────────────────────────────────
       listTileTheme: const ListTileThemeData(
         contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        titleTextStyle: TextStyle(
-          fontFamily: 'Inter',
-          fontSize: 15,
-          fontWeight: FontWeight.w500,
-          color: AppColors.textPrimary,
-        ),
-        subtitleTextStyle: TextStyle(
-          fontFamily: 'Inter',
-          fontSize: 13,
-          color: AppColors.textSecondary,
-        ),
         iconColor: AppColors.textSecondary,
       ),
 
@@ -436,6 +481,13 @@ class AppTheme {
       colorScheme: colorScheme,
       scaffoldBackgroundColor: const Color(0xFF0F172A),
       fontFamily: 'Inter',
+      extensions: const [AppPalette.dark],
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: SoftFadeUpTransitionsBuilder(),
+          TargetPlatform.iOS: SoftFadeUpTransitionsBuilder(),
+        },
+      ),
       appBarTheme: const AppBarTheme(
         backgroundColor: Color(0xFF1E293B),
         surfaceTintColor: Colors.transparent,
@@ -461,6 +513,51 @@ class AppTheme {
         margin: const EdgeInsets.only(bottom: 12),
       ),
       textTheme: _buildTextTheme(const Color(0xFFE2E8F0)),
+      listTileTheme: const ListTileThemeData(
+        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        iconColor: AppColors.darkTextSecondary,
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.accent,
+          foregroundColor: AppColors.textHeading,
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          textStyle: const TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.3,
+          ),
+          minimumSize: const Size.fromHeight(52),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.accent,
+          side: const BorderSide(color: AppColors.accent, width: 1.5),
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          textStyle: const TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
+          minimumSize: const Size.fromHeight(52),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: AppColors.accent,
+          textStyle: const TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: const Color(0xFF1E293B),
         surfaceTintColor: Colors.transparent,

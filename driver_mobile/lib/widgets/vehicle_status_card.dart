@@ -162,33 +162,8 @@ class VehicleStatusCard extends StatelessWidget {
     );
   }
 
-  Widget _buildLiveBadge() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: AppColors.success.withValues(alpha: 0.2),
-        borderRadius: AppSpacing.roundedFull,
-        border: Border.all(color: AppColors.success.withValues(alpha: 0.4)),
-      ),
-      child: const Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.circle, color: AppColors.success, size: 7),
-          SizedBox(width: 5),
-          Text(
-            "LIVE",
-            style: TextStyle(
-              fontFamily: 'Inter',
-              color: AppColors.success,
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.5,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  // Contenu 100% statique — extrait pour éviter la recréation à chaque build.
+  static Widget _buildLiveBadge() => _LiveBadge._instance;
 
   Widget _buildMetric(IconData icon, String value, String label, Color valueColor) {
     return Expanded(
@@ -225,6 +200,42 @@ class VehicleStatusCard extends StatelessWidget {
       width: 1,
       height: 40,
       color: Colors.white.withValues(alpha: 0.1),
+    );
+  }
+}
+
+// Badge "LIVE" — contenu purement statique, singleton réutilisé à chaque build.
+class _LiveBadge extends StatelessWidget {
+  const _LiveBadge();
+
+  static const _LiveBadge _instance = _LiveBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppColors.success.withValues(alpha: 0.2),
+        borderRadius: AppSpacing.roundedFull,
+        border: Border.all(color: AppColors.success.withValues(alpha: 0.4)),
+      ),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.circle, color: AppColors.success, size: 7),
+          SizedBox(width: 5),
+          Text(
+            'LIVE',
+            style: TextStyle(
+              fontFamily: 'Inter',
+              color: AppColors.success,
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

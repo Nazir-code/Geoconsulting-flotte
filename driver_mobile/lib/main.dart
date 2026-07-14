@@ -63,6 +63,7 @@ class DriverMobileApp extends StatelessWidget {
         theme: AppTheme.lightTheme,
         darkTheme: AppTheme.darkTheme,
         themeMode: ThemeService.instance.mode,
+        themeAnimationDuration: Duration.zero,
         home: const SplashScreen(),
         routes: {
           '/login': (_) => const LoginScreen(),

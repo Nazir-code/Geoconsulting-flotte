@@ -103,6 +103,31 @@ class FirestoreService {
         .snapshots();
   }
 
+  /// Écoute les notifications Firestore pour un chauffeur spécifique.
+  /// Utilise un snapshot temps réel pour mettre à jour le badge de la cloche.
+  Stream<QuerySnapshot<Map<String, dynamic>>> listenToNotifications(String uid) {
+    return _db
+        .collection('notifications')
+        .where('userId', isEqualTo: uid)
+        .orderBy('createdAt', descending: true)
+        .snapshots();
+  }
+
+  /// Compte les notifications non lues dans Firestore.
+  Future<int> getUnreadNotificationCount(String uid) async {
+    try {
+      final snapshot = await _db
+          .collection('notifications')
+          .where('userId', isEqualTo: uid)
+          .where('isRead', isEqualTo: false)
+          .get();
+      return snapshot.docs.length;
+    } catch (e) {
+      print('❌ [FirestoreService] getUnreadNotificationCount: $e');
+      return 0;
+    }
+  }
+
   /// Met à jour le statut d'une mission (ex: de 'pending' à 'in_progress')
   Future<void> updateMissionStatus(String missionId, String status) async {
     try {
@@ -168,6 +193,78 @@ class FirestoreService {
     } catch (e) {
       print("Erreur Firestore Get Mission History: $e");
       return [];
+    }
+  }
+
+  /// Retourne la liste des véhicules de la flotte.
+  /// Utilisé par FuelEntryScreen et MaintenanceRequestScreen pour le sélecteur.
+  Future<List<Map<String, dynamic>>> getVehicles() async {
+    try {
+      final snapshot = await _db.collection('vehicles').get();
+      return snapshot.docs
+          .map((doc) => {'id': doc.id, ...doc.data()})
+          .toList();
+    } catch (e) {
+      debugPrint('❌ [FirestoreService] getVehicles: $e');
+      return [];
+    }
+  }
+
+  /// Enregistre un plein de carburant dans la collection `fuel_records`.
+  Future<void> addFuelRecord({
+    required String vehicleId,
+    required String vehiclePlate,
+    required double quantity,
+    required double pricePerLiter,
+    required String station,
+    double? mileage,
+    String? driverId,
+    String? driverName,
+  }) async {
+    try {
+      await _db.collection('fuel_records').add({
+        'vehicleId': vehicleId,
+        'vehiclePlate': vehiclePlate,
+        'quantity': quantity,
+        'pricePerLiter': pricePerLiter,
+        'totalCost': quantity * pricePerLiter,
+        'station': station,
+        if (mileage != null) 'mileage': mileage,
+        if (driverId != null) 'driverId': driverId,
+        if (driverName != null) 'driverName': driverName,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      debugPrint('❌ [FirestoreService] addFuelRecord: $e');
+      rethrow;
+    }
+  }
+
+  /// Enregistre une demande d'entretien dans la collection `maintenance_requests`.
+  Future<void> addMaintenanceRequest({
+    required String vehicleId,
+    required String vehiclePlate,
+    required String type,
+    required String description,
+    double? mileage,
+    String? driverId,
+    String? driverName,
+  }) async {
+    try {
+      await _db.collection('maintenance_requests').add({
+        'vehicleId': vehicleId,
+        'vehiclePlate': vehiclePlate,
+        'type': type,
+        'description': description,
+        if (mileage != null) 'mileage': mileage,
+        if (driverId != null) 'driverId': driverId,
+        if (driverName != null) 'driverName': driverName,
+        'status': 'pending',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      debugPrint('❌ [FirestoreService] addMaintenanceRequest: $e');
+      rethrow;
     }
   }
 

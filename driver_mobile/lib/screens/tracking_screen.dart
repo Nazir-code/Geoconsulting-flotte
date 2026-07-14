@@ -33,8 +33,14 @@ class _TrackingScreenState extends State<TrackingScreen>
   bool _followMode = true;
   StreamSubscription<Position>? _gpsSubscription;
   StreamSubscription<CompassEvent>? _compassSubscription;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _driverSubscription;
 
   bool get _isTracking => GpsLifecycleManager().isGpsActive;
+
+  // Présence d'une VRAIE mission — lit drivers/{uid}.currentMission, la même
+  // source de vérité que le bouton "Terminer". Le GPS actif (chauffeur en
+  // ligne) n'implique PAS une mission en cours.
+  bool _hasActiveMission = false;
 
   @override
   void initState() {
@@ -52,6 +58,22 @@ class _TrackingScreenState extends State<TrackingScreen>
       _applyCompassHeading(event.heading!);
     });
 
+    // Suit la mission active réelle pour piloter l'affichage du panneau bas.
+    if (_uid.isNotEmpty) {
+      _driverSubscription = FirebaseFirestore.instance
+          .collection('drivers')
+          .doc(_uid)
+          .snapshots()
+          .listen((doc) {
+        if (!mounted) return;
+        final mission = doc.data()?['currentMission'] as String?;
+        final has = mission != null && mission.isNotEmpty;
+        if (has != _hasActiveMission) {
+          setState(() => _hasActiveMission = has);
+        }
+      });
+    }
+
     if (!GpsLifecycleManager().isGpsActive) {
       GpsLifecycleManager().forceStartGps();
     }
@@ -65,6 +87,7 @@ class _TrackingScreenState extends State<TrackingScreen>
   void dispose() {
     _gpsSubscription?.cancel();
     _compassSubscription?.cancel();
+    _driverSubscription?.cancel();
     super.dispose();
   }
 
@@ -159,7 +182,8 @@ class _TrackingScreenState extends State<TrackingScreen>
               AppSpacing.gapSm,
               Text(
                 "La mission sera marquée comme terminée et le suivi GPS s'arrêtera.",
-                style: AppTextStyles.bodySm,
+                style: AppTextStyles.bodySm
+                    .copyWith(color: context.palette.textSecondary),
                 textAlign: TextAlign.center,
               ),
               AppSpacing.gapXl2,
@@ -175,6 +199,9 @@ class _TrackingScreenState extends State<TrackingScreen>
                     elevation: 0,
                     shape: RoundedRectangleBorder(
                         borderRadius: AppSpacing.roundedMd),
+                    padding: EdgeInsets.zero,
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
                   child: const Text(
                     "Confirmer",
@@ -197,7 +224,7 @@ class _TrackingScreenState extends State<TrackingScreen>
                   child: Text(
                     "Annuler",
                     style: AppTextStyles.btn
-                        .copyWith(color: AppColors.textSecondary),
+                        .copyWith(color: context.palette.textSecondary),
                   ),
                 ),
               ),
@@ -287,7 +314,8 @@ class _TrackingScreenState extends State<TrackingScreen>
               AppSpacing.gapSm,
               Text(
                 "La mission sera annulée, retirée du suivi live et votre statut sera libéré.",
-                style: AppTextStyles.bodySm,
+                style: AppTextStyles.bodySm
+                    .copyWith(color: context.palette.textSecondary),
                 textAlign: TextAlign.center,
               ),
               AppSpacing.gapXl2,
@@ -299,14 +327,17 @@ class _TrackingScreenState extends State<TrackingScreen>
                       child: OutlinedButton(
                         onPressed: () => Navigator.pop(ctx, false),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.textSecondary,
-                          side: const BorderSide(color: AppColors.border),
+                          foregroundColor: context.palette.textSecondary,
+                          side: BorderSide(color: context.palette.border),
                           shape: RoundedRectangleBorder(
                               borderRadius: AppSpacing.roundedMd),
+                          padding: EdgeInsets.zero,
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
                         child: Text("Retour",
                             style: AppTextStyles.btn
-                                .copyWith(color: AppColors.textSecondary)),
+                                .copyWith(color: context.palette.textSecondary)),
                       ),
                     ),
                   ),
@@ -322,6 +353,9 @@ class _TrackingScreenState extends State<TrackingScreen>
                           elevation: 0,
                           shape: RoundedRectangleBorder(
                               borderRadius: AppSpacing.roundedMd),
+                          padding: EdgeInsets.zero,
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
                         child: Text("Arrêter",
                             style: AppTextStyles.btn
@@ -552,7 +586,7 @@ class _TrackingScreenState extends State<TrackingScreen>
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: context.palette.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         boxShadow: [
           BoxShadow(
@@ -571,7 +605,7 @@ class _TrackingScreenState extends State<TrackingScreen>
             height: 4,
             margin: const EdgeInsets.only(bottom: 20),
             decoration: BoxDecoration(
-              color: AppColors.border,
+              color: context.palette.border,
               borderRadius: AppSpacing.roundedFull,
             ),
           ),
@@ -589,22 +623,37 @@ class _TrackingScreenState extends State<TrackingScreen>
   }
 
   Widget _buildMissionRow() {
+    final hasMission = _hasActiveMission;
+
+    // Libellés selon qu'il y a une vraie mission ou non.
+    final caption = hasMission ? "Mission active" : "Suivi GPS";
+    final status = hasMission
+        ? (_isTracking ? "Suivi GPS en cours" : "En attente de démarrage")
+        : "Aucune mission en cours";
+
+    // Pastille : mission active → ACTIF/INACTIF (vert) ; sinon en ligne (bleu).
+    final chipLabel = hasMission
+        ? (_isTracking ? 'ACTIF' : 'INACTIF')
+        : (_isTracking ? 'EN LIGNE' : 'HORS LIGNE');
+    final chipColor = hasMission ? AppColors.success : AppColors.primary;
+    final chipOn = _isTracking;
+
     return Row(
       children: [
-        // Avatar icône
+        // Avatar icône — coloré uniquement s'il y a une vraie mission
         Container(
           width: 48,
           height: 48,
           decoration: BoxDecoration(
-            gradient: _isTracking
+            gradient: hasMission
                 ? AppTheme.primaryGradient
-                : const LinearGradient(
-                    colors: [AppColors.surfaceVariant, AppColors.surfaceVariant]),
+                : LinearGradient(
+                    colors: [context.palette.surfaceVariant, context.palette.surfaceVariant]),
             borderRadius: AppSpacing.roundedMd,
           ),
           child: Icon(
             Icons.directions_car_filled_rounded,
-            color: _isTracking ? Colors.white : AppColors.textSecondary,
+            color: hasMission ? Colors.white : context.palette.textSecondary,
             size: 24,
           ),
         ),
@@ -616,13 +665,14 @@ class _TrackingScreenState extends State<TrackingScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                "Mission Active",
-                style: AppTextStyles.caption,
+                caption,
+                style: AppTextStyles.caption
+                    .copyWith(color: context.palette.textSecondary),
               ),
               const SizedBox(height: 2),
               Text(
-                _isTracking ? "Suivi GPS en cours" : "En attente de démarrage",
-                style: AppTextStyles.h5,
+                status,
+                style: AppTextStyles.h5.copyWith(color: context.palette.textHeading),
               ),
             ],
           ),
@@ -633,24 +683,22 @@ class _TrackingScreenState extends State<TrackingScreen>
           duration: const Duration(milliseconds: 300),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
-            color: _isTracking
-                ? AppColors.success.withValues(alpha: 0.1)
-                : AppColors.surfaceVariant,
+            color: chipOn
+                ? chipColor.withValues(alpha: 0.1)
+                : context.palette.surfaceVariant,
             borderRadius: AppSpacing.roundedFull,
             border: Border.all(
-              color: _isTracking
-                  ? AppColors.success.withValues(alpha: 0.3)
-                  : Colors.transparent,
+              color: chipOn ? chipColor.withValues(alpha: 0.3) : Colors.transparent,
             ),
           ),
           child: Text(
-            _isTracking ? 'ACTIF' : 'INACTIF',
+            chipLabel,
             style: TextStyle(
               fontFamily: 'Inter',
               fontSize: 11,
               fontWeight: FontWeight.w800,
               letterSpacing: 0.5,
-              color: _isTracking ? AppColors.success : AppColors.textSecondary,
+              color: chipOn ? chipColor : context.palette.textSecondary,
             ),
           ),
         ),
@@ -665,7 +713,7 @@ class _TrackingScreenState extends State<TrackingScreen>
       return Container(
         height: 54,
         decoration: BoxDecoration(
-          color: AppColors.surfaceVariant,
+          color: context.palette.surfaceVariant,
           borderRadius: AppSpacing.roundedLg,
         ),
         child: Center(
@@ -683,9 +731,9 @@ class _TrackingScreenState extends State<TrackingScreen>
               const SizedBox(width: 12),
               Text(
                 label,
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: 'Inter',
-                  color: AppColors.textSecondary,
+                  color: context.palette.textSecondary,
                   fontWeight: FontWeight.w600,
                   fontSize: 15,
                 ),
@@ -694,6 +742,11 @@ class _TrackingScreenState extends State<TrackingScreen>
           ),
         ),
       );
+    }
+
+    // ── Aucune mission réelle : panneau passif, aucun bouton mission ──────
+    if (!_hasActiveMission) {
+      return const SizedBox.shrink();
     }
 
     // ── Mission active : deux boutons ─────────────────────────────────────
@@ -729,6 +782,9 @@ class _TrackingScreenState extends State<TrackingScreen>
                 elevation: 0,
                 shape: RoundedRectangleBorder(
                     borderRadius: AppSpacing.roundedLg),
+                padding: EdgeInsets.zero,
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
             ),
           ),
@@ -754,6 +810,9 @@ class _TrackingScreenState extends State<TrackingScreen>
                 side: const BorderSide(color: AppColors.error, width: 1.5),
                 shape: RoundedRectangleBorder(
                     borderRadius: AppSpacing.roundedLg),
+                padding: EdgeInsets.zero,
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
             ),
           ),
@@ -789,6 +848,9 @@ class _TrackingScreenState extends State<TrackingScreen>
             shadowColor: Colors.transparent,
             shape: RoundedRectangleBorder(
                 borderRadius: AppSpacing.roundedLg),
+            padding: EdgeInsets.zero,
+            minimumSize: Size.zero,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
         ),
       ),
@@ -854,13 +916,25 @@ class _PulseMarkerState extends State<_PulseMarker>
     _ctrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1800),
-    )..repeat();
+    );
     _scale = Tween<double>(begin: 0.6, end: 1.0).animate(
       CurvedAnimation(parent: _ctrl, curve: Curves.easeOut),
     );
     _opacity = Tween<double>(begin: 0.5, end: 0.0).animate(
       CurvedAnimation(parent: _ctrl, curve: Curves.easeOut),
     );
+    if (widget.isActive) _ctrl.repeat();
+  }
+
+  @override
+  void didUpdateWidget(_PulseMarker old) {
+    super.didUpdateWidget(old);
+    if (widget.isActive && !_ctrl.isAnimating) {
+      _ctrl.repeat();
+    } else if (!widget.isActive && _ctrl.isAnimating) {
+      _ctrl.stop();
+      _ctrl.reset();
+    }
   }
 
   @override
