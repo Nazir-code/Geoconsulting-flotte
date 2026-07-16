@@ -97,6 +97,7 @@ function AppContent() {
         <TopBar
           title={sectionTitles[activeSection] || 'FleetNexus'}
           onRefresh={() => setRefreshKey((k) => k + 1)}
+          onSectionChange={setActiveSection}
         />
 
         {/* Main Content */}

@@ -12,9 +12,10 @@ import { FirestoreDriverService, type Driver } from '@/services/firestoreDriverS
 interface TopBarProps {
   title: string;
   onRefresh?: () => void;
+  onSectionChange?: (section: string) => void;
 }
 
-export function TopBar({ title, onRefresh }: TopBarProps) {
+export function TopBar({ title, onRefresh, onSectionChange }: TopBarProps) {
   const { user } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -256,6 +257,20 @@ export function TopBar({ title, onRefresh }: TopBarProps) {
                   notifications.map((notification) => (
                     <div
                       key={notification.id}
+                      onClick={() => {
+                        let targetSection = 'dashboard';
+                        if (notification.id.startsWith('mission-')) {
+                          targetSection = 'missions';
+                        } else if (notification.id.startsWith('fuel-')) {
+                          targetSection = 'fuel';
+                        } else if (notification.id.startsWith('maint-')) {
+                          targetSection = 'dashboard';
+                        } else if (notification.id.startsWith('driver-')) {
+                          targetSection = 'fleet';
+                        }
+                        onSectionChange?.(targetSection);
+                        setShowNotifications(false);
+                      }}
                       className={`p-3 border-b border-border/50 hover:bg-background-secondary/50 transition-colors cursor-pointer ${
                         !notification.isRead ? 'bg-accent-cyan/5' : ''
                       }`}
